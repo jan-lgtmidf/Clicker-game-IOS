@@ -85,9 +85,13 @@ jobs:
           CERT_ID=$(security find-identity -v ci.keychain | grep "iPhone Developer" | head -1 | awk '{print $2}')
           echo "Using certificate: $CERT_ID"
           cd build/ios
+          # Auto-detect the scheme name from the Xcode project
+          SCHEME=$(xcodebuild -project AstroForge.xcodeproj -list 2>/dev/null | grep -A 10 'Schemes:' | grep -v 'Schemes:' | head -1 | xargs)
+          echo "Auto-detected scheme: '$SCHEME'"
+          if [ -z "$SCHEME" ]; then SCHEME="AstroForge"; fi
           xcodebuild \
             -project AstroForge.xcodeproj \
-            -scheme AstroForge \
+            -scheme "$SCHEME" \
             -sdk iphoneos \
             -configuration Release \
             CODE_SIGN_IDENTITY="$CERT_ID" \
@@ -98,16 +102,22 @@ jobs:
             SWIFT_VERSION=5.0 \
             ENABLE_BITCODE=NO \
             clean build \
-            SYMROOT=$(pwd)/build_output 2>&1 | tail -50
+            SYMROOT=$(pwd)/build_output 2>&1 | tail -80
 
       - name: Package .app into .ipa
         run: |
           APP_PATH=$(find build/ios/build_output -name "*.app" -type d | head -1)
           echo "Found .app at: $APP_PATH"
+          APP_NAME=$(basename "$APP_PATH")
+          EXEC_NAME=$(defaults read "$APP_PATH/Info.plist" CFBundleExecutable 2>/dev/null || echo "$APP_NAME")
+          echo "App: $APP_NAME | Executable: $EXEC_NAME"
           mkdir -p Payload
-          cp -r "$APP_PATH" Payload/AstroForge.app
+          # Copy WITHOUT renaming - keep original name so Info.plist matches executable
+          cp -r "$APP_PATH" "Payload/$APP_NAME"
           zip -r AstroForge.ipa Payload
           ls -lh AstroForge.ipa
+          echo "Payload contents:"
+          ls -la Payload/
 
       - name: Upload .ipa Artifact
         uses: actions/upload-artifact@v4
