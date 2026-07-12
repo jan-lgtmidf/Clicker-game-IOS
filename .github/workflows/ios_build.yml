@@ -29,7 +29,11 @@ jobs:
 
       - name: Godot Headless Export to Xcode Project
         run: |
-          /Applications/Godot.app/Contents/MacOS/Godot --headless --export-release "iOS" build/ios/AstroForge.xcodeproj
+          /Applications/Godot.app/Contents/MacOS/Godot --headless --export-release "iOS" build/ios/AstroForge.xcodeproj || true
+          if [ ! -d "build/ios/AstroForge.xcodeproj" ]; then
+            echo "Export failed: build/ios/AstroForge.xcodeproj not found!"
+            exit 1
+          fi
 
       - name: Build Xcode Project (Unsigned)
         run: |
