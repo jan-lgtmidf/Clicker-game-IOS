@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="24" fill="#0d081b"/>
+  <!-- Glowing Hexagon -->
+  <polygon points="64,16 104,40 104,88 64,112 24,88 24,40" fill="none" stroke="#00f0ff" stroke-width="6" stroke-linejoin="round"/>
+  <polygon points="64,28 92,44 92,84 64,100 36,84 36,44" fill="none" stroke="#ff007f" stroke-width="3" stroke-linejoin="round" opacity="0.7"/>
+  <!-- Core Star -->
+  <path d="M64,48 L68,60 L80,64 L68,68 L64,80 L60,68 L48,64 L60,60 Z" fill="#39ff14"/>
+</svg>

@@ -1,0 +1,55 @@
+name: iOS Unsigned Build
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Godot 4.6.2
+        run: |
+          curl -LO https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_macos.universal.zip
+          unzip Godot_v4.6.2-stable_macos.universal.zip
+          mv Godot.app /Applications/Godot.app
+          
+      - name: Install Export Templates
+        run: |
+          curl -LO https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_export_templates.tpz
+          unzip Godot_v4.6.2-stable_export_templates.tpz
+          mkdir -p ~/Library/Application\ Support/Godot/templates/4.6.2.stable
+          mv templates/* ~/Library/Application\ Support/Godot/templates/4.6.2.stable/
+
+      - name: Create Export Directory
+        run: mkdir -p build/ios
+
+      - name: Godot Headless Export to Xcode Project
+        run: |
+          /Applications/Godot.app/Contents/MacOS/Godot --headless --export-release "iOS" build/ios/AstroForge.xcodeproj
+
+      - name: Build Xcode Project (Unsigned)
+        run: |
+          xcodebuild -project build/ios/AstroForge.xcodeproj \
+            -scheme AstroForge \
+            -sdk iphoneos \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            clean build
+
+      - name: Package .app into .ipa (Payload Trick)
+        run: |
+          mkdir Payload
+          cp -r build/ios/build/Release-iphoneos/AstroForge.app Payload/
+          zip -r AstroForge.ipa Payload
+
+      - name: Upload .ipa to GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AstroForge-Unsigned-IPA
+          path: AstroForge.ipa

@@ -1,0 +1,11 @@
+.godot/
+*.tmp
+godot_output.log
+build/
+.import/
+*.save
+*.cfg.import
+*.svg.import
+*.tscn.import
+*.gd.import
+*.wav.import

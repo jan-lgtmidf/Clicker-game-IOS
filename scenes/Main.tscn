@@ -1,0 +1,612 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scenes/Main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scenes/AsteroidCore.gd" id="2_core"]
+[ext_resource type="Script" path="res://scenes/SkillLineDrawer.gd" id="3_drawer"]
+[ext_resource type="PackedScene" path="res://scenes/FloatingText.tscn" id="4_text"]
+[ext_resource type="Script" path="res://scenes/SpaceBackground.gd" id="5_bg"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxHeader"]
+bg_color = Color(0.05, 0.03, 0.11, 0.85)
+border_width_bottom = 2
+border_color = Color(0.0, 0.94, 1.0, 0.4)
+content_margin_left = 12
+content_margin_right = 12
+content_margin_top = 10
+content_margin_bottom = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxPanel"]
+bg_color = Color(0.06, 0.04, 0.12, 0.75)
+border_width_left = 2
+border_width_right = 2
+border_width_top = 2
+border_width_bottom = 2
+border_color = Color(0.0, 0.94, 1.0, 0.25)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+content_margin_left = 12
+content_margin_right = 12
+content_margin_top = 12
+content_margin_bottom = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxTab"]
+bg_color = Color(0.10, 0.06, 0.20, 0.65)
+border_width_left = 1
+border_width_right = 1
+border_width_top = 1
+border_width_bottom = 2
+border_color = Color(0.0, 0.94, 1.0, 0.2)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+content_margin_left = 4
+content_margin_right = 4
+content_margin_top = 8
+content_margin_bottom = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxProgressBg"]
+bg_color = Color(0.04, 0.02, 0.08, 0.9)
+border_width_left = 1
+border_width_right = 1
+border_width_top = 1
+border_width_bottom = 1
+border_color = Color(0.22, 1.0, 0.08, 0.3)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxProgressFill"]
+bg_color = Color(0.22, 1.0, 0.08, 1.0)
+border_width_left = 1
+border_width_top = 1
+border_width_bottom = 1
+border_color = Color(0.39, 1.0, 0.28, 0.6)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main")
+
+[node name="GameCamera" type="Camera2D" parent="."]
+anchor_mode = 0
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Background" type="Control" parent="HUD"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("5_bg")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HUD"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 0
+
+[node name="ResourceHeader" type="PanelContainer" parent="HUD/VBoxContainer"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxHeader")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="HUD/VBoxContainer/ResourceHeader"]
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="OreContainer" type="VBoxContainer" parent="HUD/VBoxContainer/ResourceHeader/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+alignment = 1
+
+[node name="Title" type="Label" parent="HUD/VBoxContainer/ResourceHeader/HBoxContainer/OreContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.0, 0.94, 1.0, 1.0)
+theme_override_font_sizes/font_size = 10
+text = "ORE"
+horizontal_alignment = 1
+
+[node name="Amount" type="Label" parent="HUD/VBoxContainer/ResourceHeader/HBoxContainer/OreContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "0"
+horizontal_alignment = 1
+
+[node name="GasContainer" type="VBoxContainer" parent="HUD/VBoxContainer/ResourceHeader/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+alignment = 1
+
+[node name="Title" type="Label" parent="HUD/VBoxContainer/ResourceHeader/HBoxContainer/GasContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1.0, 0.0, 0.5, 1.0)
+theme_override_font_sizes/font_size = 10
+text = "GAS"
+horizontal_alignment = 1
+
+[node name="Amount" type="Label" parent="HUD/VBoxContainer/ResourceHeader/HBoxContainer/GasContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "0"
+horizontal_alignment = 1
+
+[node name="CrystalContainer" type="VBoxContainer" parent="HUD/VBoxContainer/ResourceHeader/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+alignment = 1
+
+[node name="Title" type="Label" parent="HUD/VBoxContainer/ResourceHeader/HBoxContainer/CrystalContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1.0, 0.84, 0.0, 1.0)
+theme_override_font_sizes/font_size = 10
+text = "CRYSTAL"
+horizontal_alignment = 1
+
+[node name="Amount" type="Label" parent="HUD/VBoxContainer/ResourceHeader/HBoxContainer/CrystalContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "0"
+horizontal_alignment = 1
+
+[node name="StardustContainer" type="VBoxContainer" parent="HUD/VBoxContainer/ResourceHeader/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+alignment = 1
+
+[node name="Title" type="Label" parent="HUD/VBoxContainer/ResourceHeader/HBoxContainer/StardustContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.22, 1.0, 0.08, 1.0)
+theme_override_font_sizes/font_size = 10
+text = "STARDUST"
+horizontal_alignment = 1
+
+[node name="Amount" type="Label" parent="HUD/VBoxContainer/ResourceHeader/HBoxContainer/StardustContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "0"
+horizontal_alignment = 1
+
+[node name="CollapseProgressBar" type="ProgressBar" parent="HUD/VBoxContainer"]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+theme_override_styles/background = SubResource("StyleBoxProgressBg")
+theme_override_styles/fill = SubResource("StyleBoxProgressFill")
+theme_override_font_sizes/font_size = 10
+max_value = 100000.0
+step = 1.0
+
+[node name="CoreContainer" type="CenterContainer" parent="HUD/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="AsteroidCore" type="Control" parent="HUD/VBoxContainer/CoreContainer"]
+custom_minimum_size = Vector2(300, 300)
+layout_mode = 2
+script = ExtResource("2_core")
+floating_text_scene = ExtResource("4_text")
+
+[node name="SpellsBar" type="HBoxContainer" parent="HUD/VBoxContainer"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="OverdriveBtn" type="Button" parent="HUD/VBoxContainer/SpellsBar"]
+custom_minimum_size = Vector2(140, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Overdrive (Locked)"
+
+[node name="SiphonBtn" type="Button" parent="HUD/VBoxContainer/SpellsBar"]
+custom_minimum_size = Vector2(140, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Siphon (Locked)"
+
+[node name="NetBtn" type="Button" parent="HUD/VBoxContainer/SpellsBar"]
+custom_minimum_size = Vector2(140, 30)
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Mag Net (Locked)"
+
+[node name="NavigationTabs" type="HBoxContainer" parent="HUD/VBoxContainer"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+theme_override_constants/separation = 0
+alignment = 1
+
+[node name="UpgradesTabBtn" type="Button" parent="HUD/VBoxContainer/NavigationTabs"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("StyleBoxTab")
+text = "Upgrades"
+
+[node name="AutoTabBtn" type="Button" parent="HUD/VBoxContainer/NavigationTabs"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("StyleBoxTab")
+text = "Auto"
+
+[node name="SkillsTabBtn" type="Button" parent="HUD/VBoxContainer/NavigationTabs"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("StyleBoxTab")
+text = "Skills"
+
+[node name="SingularityTabBtn" type="Button" parent="HUD/VBoxContainer/NavigationTabs"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("StyleBoxTab")
+text = "Singularity"
+
+[node name="PrestigeTabBtn" type="Button" parent="HUD/VBoxContainer/NavigationTabs"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = SubResource("StyleBoxTab")
+text = "Prestige"
+
+[node name="PanelContainer" type="PanelContainer" parent="HUD/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxPanel")
+
+[node name="UpgradesPanel" type="ScrollContainer" parent="HUD/VBoxContainer/PanelContainer"]
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/UpgradesPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="AutomationPanel" type="ScrollContainer" parent="HUD/VBoxContainer/PanelContainer"]
+visible = false
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/AutomationPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="SkillTreePanel" type="Control" parent="HUD/VBoxContainer/PanelContainer"]
+visible = false
+layout_mode = 2
+
+[node name="SkillLineDrawer" type="Control" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("3_drawer")
+
+[node name="Nodes" type="Control" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ore_magnet" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/Nodes"]
+layout_mode = 0
+offset_left = 190.0
+offset_top = 20.0
+offset_right = 320.0
+offset_bottom = 80.0
+theme_override_font_sizes/font_size = 11
+text = "Ore Magnet"
+
+[node name="gas_igniter" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/Nodes"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 140.0
+offset_right = 180.0
+offset_bottom = 200.0
+theme_override_font_sizes/font_size = 11
+text = "Gas Igniter"
+
+[node name="quantum_drill" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/Nodes"]
+layout_mode = 0
+offset_left = 330.0
+offset_top = 140.0
+offset_right = 470.0
+offset_bottom = 200.0
+theme_override_font_sizes/font_size = 11
+text = "Quantum Drill"
+
+[node name="crystal_refiner" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/Nodes"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 260.0
+offset_right = 180.0
+offset_bottom = 320.0
+theme_override_font_sizes/font_size = 11
+text = "Crystal Refiner"
+
+[node name="cosmic_forge" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/Nodes"]
+layout_mode = 0
+offset_left = 190.0
+offset_top = 370.0
+offset_right = 320.0
+offset_bottom = 430.0
+theme_override_font_sizes/font_size = 11
+text = "Cosmic Forge"
+
+[node name="SingularityPanel" type="ScrollContainer" parent="HUD/VBoxContainer/PanelContainer"]
+visible = false
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="DarkMatterHeader" type="PanelContainer" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxHeader")
+
+[node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/DarkMatterHeader"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/DarkMatterHeader/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1.0, 0.45, 0.0, 1.0)
+theme_override_font_sizes/font_size = 15
+text = "SINGULARITY CHAMBER"
+horizontal_alignment = 1
+
+[node name="DMAmount" type="Label" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/DarkMatterHeader/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1.0, 0.8, 0.0, 1.0)
+theme_override_font_sizes/font_size = 18
+text = "Dark Matter: 0.0"
+horizontal_alignment = 1
+
+[node name="InvestTitle" type="Label" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/DarkMatterHeader/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1.0)
+theme_override_font_sizes/font_size = 11
+text = "Stardust Invested: 0"
+horizontal_alignment = 1
+
+[node name="InvestBtn" type="Button" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/DarkMatterHeader/VBox"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Invest 10 Stardust (+0.2 DM/s)"
+
+[node name="UpgradesList" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PrestigePanel" type="ScrollContainer" parent="HUD/VBoxContainer/PanelContainer"]
+visible = false
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/PrestigePanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 16
+
+[node name="PrestigeCard" type="PanelContainer" parent="HUD/VBoxContainer/PanelContainer/PrestigePanel/VBox"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxHeader")
+
+[node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/PrestigePanel/VBox/PrestigeCard"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="HUD/VBoxContainer/PanelContainer/PrestigePanel/VBox/PrestigeCard/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.22, 1.0, 0.08, 1.0)
+theme_override_font_sizes/font_size = 16
+text = "COSMIC COLLAPSE"
+horizontal_alignment = 1
+
+[node name="Desc" type="Label" parent="HUD/VBoxContainer/PanelContainer/PrestigePanel/VBox/PrestigeCard/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1.0)
+theme_override_font_sizes/font_size = 11
+text = "Reset all current items and resources to release raw Stardust. Each Stardust gives +2% global production speed boost."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="LifetimeLabel" type="Label" parent="HUD/VBoxContainer/PanelContainer/PrestigePanel/VBox/PrestigeCard/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1.0)
+theme_override_font_sizes/font_size = 12
+text = "Lifetime Space Ore Mined: 0"
+horizontal_alignment = 1
+
+[node name="PendingLabel" type="Label" parent="HUD/VBoxContainer/PanelContainer/PrestigePanel/VBox/PrestigeCard/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.22, 1.0, 0.08, 1.0)
+theme_override_font_sizes/font_size = 14
+text = "Pending Stardust: +0"
+horizontal_alignment = 1
+
+[node name="PrestigeButton" type="Button" parent="HUD/VBoxContainer/PanelContainer/PrestigePanel/VBox/PrestigeCard/VBox"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Collapse: Requires 100K Ore"
+
+[node name="PerksHeading" type="Label" parent="HUD/VBoxContainer/PanelContainer/PrestigePanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.22, 1.0, 0.08, 1.0)
+theme_override_font_sizes/font_size = 14
+text = "PERMANENT STARDUST PERKS"
+horizontal_alignment = 1
+
+[node name="PerksList" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/PrestigePanel/VBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="TelemetryDrawer" type="Control" parent="HUD"]
+layout_mode = 3
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = 0.0
+offset_top = 220.0
+offset_right = 200.0
+offset_bottom = 540.0
+grow_horizontal = 0
+
+[node name="Panel" type="PanelContainer" parent="HUD/TelemetryDrawer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxPanel")
+
+[node name="VBox" type="VBoxContainer" parent="HUD/TelemetryDrawer/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Header" type="Label" parent="HUD/TelemetryDrawer/Panel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.0, 0.94, 1.0, 1.0)
+theme_override_font_sizes/font_size = 13
+text = "FORGE DIAGNOSTICS"
+horizontal_alignment = 1
+
+[node name="RateOre" type="Label" parent="HUD/TelemetryDrawer/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Ore/s: 0.0"
+
+[node name="RateGas" type="Label" parent="HUD/TelemetryDrawer/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Gas/s: 0.0"
+
+[node name="RateCrystal" type="Label" parent="HUD/TelemetryDrawer/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Crystal/s: 0.0"
+
+[node name="Combo" type="Label" parent="HUD/TelemetryDrawer/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Core Combo: x1.0"
+
+[node name="Comets" type="Label" parent="HUD/TelemetryDrawer/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Comets: 0"
+
+[node name="SuperNova" type="Label" parent="HUD/TelemetryDrawer/Panel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Next Alert: 90s"
+
+[node name="ToggleBtn" type="Button" parent="HUD/TelemetryDrawer"]
+layout_mode = 0
+offset_left = -34.0
+offset_top = 130.0
+offset_right = -2.0
+offset_bottom = 190.0
+theme_override_font_sizes/font_size = 12
+text = "<"
+
+[node name="OfflineModal" type="ColorRect" parent="HUD"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.03, 0.01, 0.06, 0.65)
+
+[node name="Center" type="CenterContainer" parent="HUD/OfflineModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Card" type="PanelContainer" parent="HUD/OfflineModal/Center"]
+custom_minimum_size = Vector2(360, 240)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxPanel")
+
+[node name="VBox" type="VBoxContainer" parent="HUD/OfflineModal/Center/Card"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="Welcome" type="Label" parent="HUD/OfflineModal/Center/Card/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.0, 0.94, 1.0, 1.0)
+theme_override_font_sizes/font_size = 16
+text = "WELCOME BACK COMMANDER"
+horizontal_alignment = 1
+
+[node name="AwayText" type="Label" parent="HUD/OfflineModal/Center/Card/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.85, 0.85, 1.0)
+theme_override_font_sizes/font_size = 11
+text = "While you were away, your automatic network generated:"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="OreAmount" type="Label" parent="HUD/OfflineModal/Center/Card/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.0, 0.94, 1.0, 1.0)
+theme_override_font_sizes/font_size = 13
+text = "+0 Ore"
+horizontal_alignment = 1
+
+[node name="GasAmount" type="Label" parent="HUD/OfflineModal/Center/Card/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1.0, 0.0, 0.5, 1.0)
+theme_override_font_sizes/font_size = 13
+text = "+0 Gas"
+horizontal_alignment = 1
+
+[node name="CrystalAmount" type="Label" parent="HUD/OfflineModal/Center/Card/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1.0, 0.84, 0.0, 1.0)
+theme_override_font_sizes/font_size = 13
+text = "+0 Crystal"
+horizontal_alignment = 1
+
+[node name="ConfirmBtn" type="Button" parent="HUD/OfflineModal/Center/Card/VBox"]
+custom_minimum_size = Vector2(160, 38)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 13
+text = "HARVEST DATA"
