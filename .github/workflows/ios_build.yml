@@ -27,32 +27,20 @@ jobs:
 
       - name: Prepare Project
         run: |
-          # Disable MCP plugin
           sed -i '' 's/"godot_mcp"//g' project.godot || true
           mv addons/godot_mcp addons/godot_mcp_disabled || true
-          # Create export directory
           mkdir -p ios
 
       - name: Export Godot iOS Project
         run: |
           /Applications/Godot.app/Contents/MacOS/Godot \
             --headless --path "." \
-            --export-release "iOS" \
-            "ios/AstroForge.xcodeproj" 2>&1 | tail -20 || true
+            --export-release "iOS" "ios/AstroForge.xcodeproj" 2>&1 | tail -20 || true
           if [ ! -d "ios/AstroForge.xcodeproj" ]; then
-            echo "ERROR: Godot export failed!"
+            echo "Export failed!"
             exit 1
           fi
-          echo "✅ Xcode project created!"
-
-      - name: Switch to Manual Signing
-        run: |
-          PBXPROJ="ios/AstroForge.xcodeproj/project.pbxproj"
-          # Switch from Automatic to Manual signing to avoid conflicts
-          sed -i '' 's/ProvisioningStyle = Automatic/ProvisioningStyle = Manual/g' "$PBXPROJ" || true
-          sed -i '' 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' "$PBXPROJ" || true
-          echo "Signing style in project:"
-          grep -i "signingStyle\|ProvisioningStyle\|CODE_SIGN_STYLE" "$PBXPROJ" | head -5 || true
+          echo "✅ Export OK"
 
       - name: Create Self-Signed Certificate
         run: |
@@ -71,55 +59,50 @@ jobs:
             -s -k "ci" ci.keychain
           CERT=$(security find-identity -v ci.keychain | grep "iPhone Developer" | awk '{print $2}' | head -1)
           echo "CERT_ID=$CERT" >> $GITHUB_ENV
-          echo "Certificate: $CERT"
 
-      - name: Build Xcode Archive
+      - name: Build Xcode Project
         run: |
-          SCHEME=$(xcodebuild -project ios/AstroForge.xcodeproj -list 2>/dev/null \
+          cd ios
+          SCHEME=$(xcodebuild -project AstroForge.xcodeproj -list 2>/dev/null \
             | grep -A20 'Schemes:' | grep -v 'Schemes:' | grep -v '^$' | head -1 | xargs)
           [ -z "$SCHEME" ] && SCHEME="AstroForge"
-          echo "Scheme: $SCHEME | Cert: $CERT_ID"
+          echo "Building scheme: $SCHEME"
 
-          xcodebuild archive \
-            -project ios/AstroForge.xcodeproj \
+          xcodebuild \
+            -project AstroForge.xcodeproj \
             -scheme "$SCHEME" \
             -sdk iphoneos \
             -configuration Release \
-            -archivePath ios/AstroForge.xcarchive \
-            CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="$CERT_ID" \
             CODE_SIGNING_REQUIRED=YES \
             CODE_SIGNING_ALLOWED=YES \
-            DEVELOPMENT_TEAM="" \
             PRODUCT_BUNDLE_IDENTIFIER=com.jan.astroforge \
             ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
+            SWIFT_VERSION=5.0 \
             ENABLE_BITCODE=NO \
-            2>&1 | grep -E "(error:|warning:|BUILD|Signing|Archive)"
-          echo "Archive contents:"
-          ls -la ios/AstroForge.xcarchive/Products/Applications/ 2>/dev/null || \
-            find ios/AstroForge.xcarchive -name "*.app" 2>/dev/null || \
-            echo "No .app found in archive!"
+            clean build \
+            SYMROOT=$(pwd)/build_output \
+            2>&1 | tail -30
 
       - name: Package into IPA
         run: |
-          APP=$(find ios/AstroForge.xcarchive -name "*.app" -type d | head -1)
-          echo "App: $APP"
-          [ -z "$APP" ] && echo "ERROR: No .app found!" && exit 1
+          APP=$(find ios/build_output -name "*.app" -type d | head -1)
+          echo "Found: $APP"
+          [ -z "$APP" ] && echo "No .app found!" && find ios -name "*.app" -type d && exit 1
 
-          # Verify binary exists
           EXEC=$(defaults read "$APP/Info.plist" CFBundleExecutable 2>/dev/null)
-          echo "Executable name: $EXEC"
-          ls -la "$APP/$EXEC" 2>/dev/null && echo "✅ Binary found!" || echo "⚠️ Binary missing!"
+          echo "Executable: $EXEC"
+          [ -f "$APP/$EXEC" ] && echo "✅ Binary exists!" || echo "⚠️ Binary missing!"
 
-          # Remove our CI signature — Sideloadly will re-sign with your Apple ID
-          find "$APP" -name "*.dylib" -o -name "*.framework" | \
+          # Strip CI signature so Sideloadly can re-sign cleanly
+          find "$APP" \( -name "*.dylib" -o -name "*.framework" \) | \
             xargs -I{} codesign --remove-signature {} 2>/dev/null || true
           codesign --remove-signature "$APP" 2>/dev/null || true
 
           mkdir -p Payload
           cp -r "$APP" Payload/
           zip -r AstroForge.ipa Payload
-          echo "IPA size: $(du -h AstroForge.ipa | cut -f1)"
+          echo "✅ IPA: $(du -h AstroForge.ipa | cut -f1)"
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
