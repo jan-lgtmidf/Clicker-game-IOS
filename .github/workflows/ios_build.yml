@@ -36,6 +36,19 @@ jobs:
         run: |
           mkdir -p build/ios
 
+      - name: Disable MCP Plugin for CI Export
+        run: |
+          echo "Disabling MCP addon in project.godot..."
+          # Remove godot_mcp from enabled plugins
+          sed -i '' 's/enabled=PackedStringArray("godot_mcp")/enabled=PackedStringArray()/' project.godot || true
+          sed -i '' 's/"godot_mcp",//' project.godot || true
+          sed -i '' 's/,"godot_mcp"//' project.godot || true
+          sed -i '' 's/"godot_mcp"//' project.godot || true
+          echo "project.godot plugins line:"
+          grep -i "enabled" project.godot || echo "No enabled line found"
+          # Also temporarily remove addon folder to prevent loading
+          mv addons/godot_mcp addons/godot_mcp_disabled || true
+
       - name: Run Godot iOS Export
         run: |
           /Applications/Godot.app/Contents/MacOS/Godot \
