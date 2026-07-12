@@ -17,7 +17,7 @@ jobs:
           mv addons/godot_mcp addons/godot_mcp_disabled || true
 
       - name: Export Godot iOS Project
-        uses: dulvui/godot4-ios-export@v0.0.2
+        uses: dulvui/godot4-ios-export@main
         with:
           godot-version: 4.6.2
           working-directory: .
