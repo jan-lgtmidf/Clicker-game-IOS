@@ -15,6 +15,8 @@ jobs:
         run: |
           sed -i '' 's/"godot_mcp"//g' project.godot || true
           mv addons/godot_mcp addons/godot_mcp_disabled || true
+          # Create ios/ folder that dulvui action expects
+          mkdir -p ios
 
       - name: Export Godot iOS Project
         uses: dulvui/godot4-ios-export@main
