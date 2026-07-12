@@ -10,8 +10,6 @@ jobs:
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
-        with:
-          lfs: false
 
       - name: Setup Godot 4.6.2
         run: |
@@ -19,8 +17,6 @@ jobs:
           unzip -q godot.zip
           xattr -rc "Godot.app" 2>/dev/null || true
           sudo mv "Godot.app" /Applications/Godot.app
-          echo "Godot version:"
-          /Applications/Godot.app/Contents/MacOS/Godot --version
 
       - name: Install iOS Export Templates
         run: |
@@ -29,25 +25,14 @@ jobs:
           TEMPLATE_DIR="$HOME/Library/Application Support/Godot/export_templates/4.6.2.stable"
           mkdir -p "$TEMPLATE_DIR"
           mv templates/* "$TEMPLATE_DIR/"
-          echo "Templates installed:"
-          ls "$TEMPLATE_DIR/" | grep ios || echo "Warning: No iOS templates found!"
 
-      - name: Create Export Directories
+      - name: Disable MCP Plugin for CI
         run: |
-          mkdir -p build/ios
-
-      - name: Disable MCP Plugin for CI Export
-        run: |
-          echo "Disabling MCP addon in project.godot..."
-          # Remove godot_mcp from enabled plugins
-          sed -i '' 's/enabled=PackedStringArray("godot_mcp")/enabled=PackedStringArray()/' project.godot || true
-          sed -i '' 's/"godot_mcp",//' project.godot || true
-          sed -i '' 's/,"godot_mcp"//' project.godot || true
-          sed -i '' 's/"godot_mcp"//' project.godot || true
-          echo "project.godot plugins line:"
-          grep -i "enabled" project.godot || echo "No enabled line found"
-          # Also temporarily remove addon folder to prevent loading
+          sed -i '' 's/"godot_mcp"//g' project.godot || true
           mv addons/godot_mcp addons/godot_mcp_disabled || true
+
+      - name: Create Export Directory
+        run: mkdir -p build/ios
 
       - name: Run Godot iOS Export
         run: |
@@ -57,33 +42,63 @@ jobs:
             --export-release "iOS" \
             "build/ios/AstroForge.xcodeproj" \
             2>&1 | tee export_log.txt || true
-          echo "--- Export log ---"
-          cat export_log.txt
-          echo "--- Build dir contents ---"
-          ls -la build/ios/ || echo "build/ios is empty"
+          ls -la build/ios/ || true
           if [ ! -d "build/ios/AstroForge.xcodeproj" ]; then
-            echo "ERROR: Xcode project not created!"
+            cat export_log.txt
             exit 1
           fi
-          echo "Xcode project created successfully!"
 
-      - name: Build Xcode Project (Unsigned)
+      - name: Create Self-Signed Certificate for Swift Linking
         run: |
+          # Generate self-signed cert & import into temporary keychain
+          security create-keychain -p "ci_password" ci.keychain
+          security default-keychain -s ci.keychain
+          security unlock-keychain -p "ci_password" ci.keychain
+          security set-keychain-settings -t 7200 ci.keychain
+
+          openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
+            -keyout /tmp/signing.key \
+            -out /tmp/signing.crt \
+            -subj "/CN=iPhone Developer/O=AstroForge CI/OU=Development/C=US"
+
+          openssl pkcs12 -export \
+            -inkey /tmp/signing.key \
+            -in /tmp/signing.crt \
+            -out /tmp/signing.p12 \
+            -passout pass:ci_password
+
+          security import /tmp/signing.p12 \
+            -k ci.keychain \
+            -P ci_password \
+            -T /usr/bin/codesign \
+            -T /usr/bin/xcodebuild
+
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "ci_password" ci.keychain
+
+          echo "Certificate imported:"
+          security find-identity -v ci.keychain | head -5
+
+      - name: Build Xcode Project (Self-Signed)
+        run: |
+          CERT_ID=$(security find-identity -v ci.keychain | grep "iPhone Developer" | head -1 | awk '{print $2}')
+          echo "Using certificate: $CERT_ID"
           cd build/ios
           xcodebuild \
             -project AstroForge.xcodeproj \
             -scheme AstroForge \
             -sdk iphoneos \
             -configuration Release \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_IDENTITY="$CERT_ID" \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGNING_ALLOWED=YES \
             PRODUCT_BUNDLE_IDENTIFIER=com.jan.astroforge \
             ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
             SWIFT_VERSION=5.0 \
             ENABLE_BITCODE=NO \
             clean build \
-            SYMROOT=$(pwd)/build_output 2>&1
+            SYMROOT=$(pwd)/build_output 2>&1 | tail -50
 
       - name: Package .app into .ipa
         run: |
@@ -92,6 +107,7 @@ jobs:
           mkdir -p Payload
           cp -r "$APP_PATH" Payload/AstroForge.app
           zip -r AstroForge.ipa Payload
+          ls -lh AstroForge.ipa
 
       - name: Upload .ipa Artifact
         uses: actions/upload-artifact@v4
