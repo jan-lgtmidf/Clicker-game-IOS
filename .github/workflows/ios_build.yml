@@ -10,50 +10,76 @@ jobs:
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
+        with:
+          lfs: false
 
       - name: Setup Godot 4.6.2
         run: |
-          curl -LO https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_macos.universal.zip
-          unzip Godot_v4.6.2-stable_macos.universal.zip
-          mv Godot.app /Applications/Godot.app
-          
-      - name: Install Export Templates
-        run: |
-          curl -LO https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_export_templates.tpz
-          unzip Godot_v4.6.2-stable_export_templates.tpz
-          mkdir -p ~/Library/Application\ Support/Godot/export_templates/4.6.2.stable
-          mv templates/* ~/Library/Application\ Support/Godot/export_templates/4.6.2.stable/
+          curl -L -o godot.zip "https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_macos.universal.zip"
+          unzip -q godot.zip
+          xattr -rc "Godot.app" 2>/dev/null || true
+          sudo mv "Godot.app" /Applications/Godot.app
+          echo "Godot version:"
+          /Applications/Godot.app/Contents/MacOS/Godot --version
 
-      - name: Create Export Directory
-        run: mkdir -p build/ios
-
-      - name: Godot Headless Export to Xcode Project
+      - name: Install iOS Export Templates
         run: |
-          /Applications/Godot.app/Contents/MacOS/Godot --headless --export-release "iOS" build/ios/AstroForge.xcodeproj || true
+          curl -L -o templates.tpz "https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_export_templates.tpz"
+          unzip -q templates.tpz
+          TEMPLATE_DIR="$HOME/Library/Application Support/Godot/export_templates/4.6.2.stable"
+          mkdir -p "$TEMPLATE_DIR"
+          mv templates/* "$TEMPLATE_DIR/"
+          echo "Templates installed:"
+          ls "$TEMPLATE_DIR/" | grep ios || echo "Warning: No iOS templates found!"
+
+      - name: Create Export Directories
+        run: |
+          mkdir -p build/ios
+
+      - name: Run Godot iOS Export
+        run: |
+          /Applications/Godot.app/Contents/MacOS/Godot \
+            --headless \
+            --path "." \
+            --export-release "iOS" \
+            "build/ios/AstroForge.xcodeproj" \
+            2>&1 | tee export_log.txt || true
+          echo "--- Export log ---"
+          cat export_log.txt
+          echo "--- Build dir contents ---"
+          ls -la build/ios/ || echo "build/ios is empty"
           if [ ! -d "build/ios/AstroForge.xcodeproj" ]; then
-            echo "Export failed: build/ios/AstroForge.xcodeproj not found!"
+            echo "ERROR: Xcode project not created!"
             exit 1
           fi
+          echo "Xcode project created successfully!"
 
       - name: Build Xcode Project (Unsigned)
         run: |
-          xcodebuild -project build/ios/AstroForge.xcodeproj \
+          cd build/ios
+          xcodebuild \
+            -project AstroForge.xcodeproj \
             -scheme AstroForge \
             -sdk iphoneos \
             -configuration Release \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            clean build
+            PRODUCT_BUNDLE_IDENTIFIER=com.jan.astroforge \
+            clean build \
+            SYMROOT=$(pwd)/build_output 2>&1
 
-      - name: Package .app into .ipa (Payload Trick)
+      - name: Package .app into .ipa
         run: |
-          mkdir Payload
-          cp -r build/ios/build/Release-iphoneos/AstroForge.app Payload/
+          APP_PATH=$(find build/ios/build_output -name "*.app" -type d | head -1)
+          echo "Found .app at: $APP_PATH"
+          mkdir -p Payload
+          cp -r "$APP_PATH" Payload/AstroForge.app
           zip -r AstroForge.ipa Payload
 
-      - name: Upload .ipa to GitHub Artifacts
+      - name: Upload .ipa Artifact
         uses: actions/upload-artifact@v4
         with:
           name: AstroForge-Unsigned-IPA
           path: AstroForge.ipa
+          if-no-files-found: error
