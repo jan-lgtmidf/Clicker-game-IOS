@@ -42,15 +42,15 @@ jobs:
             --export-release "iOS" \
             "build/ios/AstroForge.xcodeproj" \
             2>&1 | tee export_log.txt || true
-          ls -la build/ios/ || true
           if [ ! -d "build/ios/AstroForge.xcodeproj" ]; then
             cat export_log.txt
             exit 1
           fi
+          echo "Export OK. Xcode project schemes:"
+          xcodebuild -project build/ios/AstroForge.xcodeproj -list 2>/dev/null || true
 
-      - name: Create Self-Signed Certificate for Swift Linking
+      - name: Create Self-Signed Certificate
         run: |
-          # Generate self-signed cert & import into temporary keychain
           security create-keychain -p "ci_password" ci.keychain
           security default-keychain -s ci.keychain
           security unlock-keychain -p "ci_password" ci.keychain
@@ -77,47 +77,55 @@ jobs:
             -S apple-tool:,apple:,codesign: \
             -s -k "ci_password" ci.keychain
 
-          echo "Certificate imported:"
-          security find-identity -v ci.keychain | head -5
-
-      - name: Build Xcode Project (Self-Signed)
+      - name: Archive Xcode Project
         run: |
           CERT_ID=$(security find-identity -v ci.keychain | grep "iPhone Developer" | head -1 | awk '{print $2}')
-          echo "Using certificate: $CERT_ID"
-          cd build/ios
-          # Auto-detect the scheme name from the Xcode project
-          SCHEME=$(xcodebuild -project AstroForge.xcodeproj -list 2>/dev/null | grep -A 10 'Schemes:' | grep -v 'Schemes:' | head -1 | xargs)
-          echo "Auto-detected scheme: '$SCHEME'"
+          SCHEME=$(xcodebuild -project build/ios/AstroForge.xcodeproj -list 2>/dev/null | grep -A 20 'Schemes:' | grep -v 'Schemes:' | grep -v '^$' | head -1 | xargs)
+          echo "Scheme: '$SCHEME' | Cert: '$CERT_ID'"
           if [ -z "$SCHEME" ]; then SCHEME="AstroForge"; fi
-          xcodebuild \
-            -project AstroForge.xcodeproj \
+
+          xcodebuild archive \
+            -project build/ios/AstroForge.xcodeproj \
             -scheme "$SCHEME" \
             -sdk iphoneos \
             -configuration Release \
+            -archivePath build/ios/AstroForge.xcarchive \
             CODE_SIGN_IDENTITY="$CERT_ID" \
             CODE_SIGNING_REQUIRED=YES \
             CODE_SIGNING_ALLOWED=YES \
             PRODUCT_BUNDLE_IDENTIFIER=com.jan.astroforge \
             ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
-            SWIFT_VERSION=5.0 \
             ENABLE_BITCODE=NO \
-            clean build \
-            SYMROOT=$(pwd)/build_output 2>&1 | tail -80
+            2>&1 | tail -80
 
-      - name: Package .app into .ipa
+          echo "=== Archive contents ==="
+          ls -la build/ios/AstroForge.xcarchive/Products/Applications/ || true
+
+      - name: Package .xcarchive into .ipa
         run: |
-          APP_PATH=$(find build/ios/build_output -name "*.app" -type d | head -1)
-          echo "Found .app at: $APP_PATH"
+          APP_PATH=$(find build/ios/AstroForge.xcarchive/Products/Applications -name "*.app" -type d | head -1)
+          echo "App path: $APP_PATH"
           APP_NAME=$(basename "$APP_PATH")
-          EXEC_NAME=$(defaults read "$APP_PATH/Info.plist" CFBundleExecutable 2>/dev/null || echo "$APP_NAME")
-          echo "App: $APP_NAME | Executable: $EXEC_NAME"
+          echo "App name: $APP_NAME"
+
+          # Show Info.plist so we know the executable name
+          echo "=== Info.plist ==="
+          cat "$APP_PATH/Info.plist" | grep -A1 "CFBundleExecutable" || true
+          EXEC=$(defaults read "$APP_PATH/Info.plist" CFBundleExecutable 2>/dev/null || echo "UNKNOWN")
+          echo "CFBundleExecutable: $EXEC"
+
+          # Check binary exists
+          if [ -f "$APP_PATH/$EXEC" ]; then
+            echo "✅ Binary '$EXEC' found!"
+          else
+            echo "❌ Binary '$EXEC' NOT found. Contents of .app:"
+            ls -la "$APP_PATH/"
+          fi
+
           mkdir -p Payload
-          # Copy WITHOUT renaming - keep original name so Info.plist matches executable
-          cp -r "$APP_PATH" "Payload/$APP_NAME"
+          cp -r "$APP_PATH" "Payload/"
           zip -r AstroForge.ipa Payload
           ls -lh AstroForge.ipa
-          echo "Payload contents:"
-          ls -la Payload/
 
       - name: Upload .ipa Artifact
         uses: actions/upload-artifact@v4
