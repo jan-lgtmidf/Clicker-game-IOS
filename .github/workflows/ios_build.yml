@@ -11,116 +11,33 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Godot 4.6.2
-        run: |
-          curl -L -o godot.zip "https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_macos.universal.zip"
-          unzip -q godot.zip
-          xattr -rc "Godot.app" 2>/dev/null || true
-          sudo mv "Godot.app" /Applications/Godot.app
-
-      - name: Install iOS Export Templates
-        run: |
-          curl -L -o templates.tpz "https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_export_templates.tpz"
-          unzip -q templates.tpz
-          TEMPLATE_DIR="$HOME/Library/Application Support/Godot/export_templates/4.6.2.stable"
-          mkdir -p "$TEMPLATE_DIR"
-          mv templates/* "$TEMPLATE_DIR/"
-
       - name: Disable MCP Plugin for CI
         run: |
           sed -i '' 's/"godot_mcp"//g' project.godot || true
           mv addons/godot_mcp addons/godot_mcp_disabled || true
 
-      - name: Create Export Directory
-        run: mkdir -p build/ios
+      - name: Export Godot iOS Project
+        uses: dulvui/godot4-ios-export@v0.0.2
+        with:
+          godot-version: 4.6.2
+          working-directory: .
 
-      - name: Run Godot iOS Export
+      - name: Package .app into unsigned .ipa
         run: |
-          /Applications/Godot.app/Contents/MacOS/Godot \
-            --headless \
-            --path "." \
-            --export-release "iOS" \
-            "build/ios/AstroForge.xcodeproj" \
-            2>&1 | tee export_log.txt || true
-          if [ ! -d "build/ios/AstroForge.xcodeproj" ]; then
-            cat export_log.txt
-            exit 1
+          # Find the exported Xcode project
+          echo "=== Searching for .xcodeproj ==="
+          find . -name "*.xcodeproj" -type d 2>/dev/null || true
+          find . -name "*.app" -type d 2>/dev/null | head -10 || true
+
+          # The dulvui action exports to ios/
+          APP_PATH=$(find . -name "*.app" -path "*/Release-iphoneos/*" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find . -name "*.app" -type d | grep -v ".xcodeproj" | head -1)
           fi
-          echo "Export OK. Xcode project schemes:"
-          xcodebuild -project build/ios/AstroForge.xcodeproj -list 2>/dev/null || true
+          echo "Found .app: $APP_PATH"
 
-      - name: Create Self-Signed Certificate
-        run: |
-          security create-keychain -p "ci_password" ci.keychain
-          security default-keychain -s ci.keychain
-          security unlock-keychain -p "ci_password" ci.keychain
-          security set-keychain-settings -t 7200 ci.keychain
-
-          openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
-            -keyout /tmp/signing.key \
-            -out /tmp/signing.crt \
-            -subj "/CN=iPhone Developer/O=AstroForge CI/OU=Development/C=US"
-
-          openssl pkcs12 -export \
-            -inkey /tmp/signing.key \
-            -in /tmp/signing.crt \
-            -out /tmp/signing.p12 \
-            -passout pass:ci_password
-
-          security import /tmp/signing.p12 \
-            -k ci.keychain \
-            -P ci_password \
-            -T /usr/bin/codesign \
-            -T /usr/bin/xcodebuild
-
-          security set-key-partition-list \
-            -S apple-tool:,apple:,codesign: \
-            -s -k "ci_password" ci.keychain
-
-      - name: Archive Xcode Project
-        run: |
-          CERT_ID=$(security find-identity -v ci.keychain | grep "iPhone Developer" | head -1 | awk '{print $2}')
-          SCHEME=$(xcodebuild -project build/ios/AstroForge.xcodeproj -list 2>/dev/null | grep -A 20 'Schemes:' | grep -v 'Schemes:' | grep -v '^$' | head -1 | xargs)
-          echo "Scheme: '$SCHEME' | Cert: '$CERT_ID'"
-          if [ -z "$SCHEME" ]; then SCHEME="AstroForge"; fi
-
-          xcodebuild archive \
-            -project build/ios/AstroForge.xcodeproj \
-            -scheme "$SCHEME" \
-            -sdk iphoneos \
-            -configuration Release \
-            -archivePath build/ios/AstroForge.xcarchive \
-            CODE_SIGN_IDENTITY="$CERT_ID" \
-            CODE_SIGNING_REQUIRED=YES \
-            CODE_SIGNING_ALLOWED=YES \
-            PRODUCT_BUNDLE_IDENTIFIER=com.jan.astroforge \
-            ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
-            ENABLE_BITCODE=NO \
-            2>&1 | tail -80
-
-          echo "=== Archive contents ==="
-          ls -la build/ios/AstroForge.xcarchive/Products/Applications/ || true
-
-      - name: Package .xcarchive into .ipa
-        run: |
-          APP_PATH=$(find build/ios/AstroForge.xcarchive/Products/Applications -name "*.app" -type d | head -1)
-          echo "App path: $APP_PATH"
           APP_NAME=$(basename "$APP_PATH")
           echo "App name: $APP_NAME"
-
-          # Show Info.plist so we know the executable name
-          echo "=== Info.plist ==="
-          cat "$APP_PATH/Info.plist" | grep -A1 "CFBundleExecutable" || true
-          EXEC=$(defaults read "$APP_PATH/Info.plist" CFBundleExecutable 2>/dev/null || echo "UNKNOWN")
-          echo "CFBundleExecutable: $EXEC"
-
-          # Check binary exists
-          if [ -f "$APP_PATH/$EXEC" ]; then
-            echo "✅ Binary '$EXEC' found!"
-          else
-            echo "❌ Binary '$EXEC' NOT found. Contents of .app:"
-            ls -la "$APP_PATH/"
-          fi
 
           mkdir -p Payload
           cp -r "$APP_PATH" "Payload/"
