@@ -29,11 +29,17 @@ func _ready() -> void:
 	# Disable minimum size constraint to stretch freely
 	custom_minimum_size = Vector2.ZERO
 	
-	# Initial full-screen setup
-	var view_size = get_viewport_rect().size
-	global_position = Vector2.ZERO
-	size = view_size
-	center = view_size / 2.0
+	# Force anchors and offsets to stretch and fill the parent CanvasLayer/Viewport
+	anchor_left = 0.0
+	anchor_top = 0.0
+	anchor_right = 1.0
+	anchor_bottom = 1.0
+	offset_left = 0.0
+	offset_top = 0.0
+	offset_right = 0.0
+	offset_bottom = 0.0
+	
+	center = size / 2.0
 	
 	# Load custom background with dynamic fallback for editor/exported build compatibility
 	var bg_path = "res://assets/custom_background.jpg"
@@ -129,11 +135,8 @@ func apply_click_displacement(click_pos: Vector2, color_tint: Color = Color.WHIT
 				dust["color"] = dust["color"].lerp(color_tint, 0.5)
 
 func _process(delta: float) -> void:
-	# Maintain full-screen scaling and positioning dynamically
-	var view_size = get_viewport_rect().size
-	global_position = Vector2.ZERO
-	size = view_size
-	center = view_size / 2.0
+	# Dynamically update the center of the animation to match the Control's size
+	center = size / 2.0
 	
 	rot_angle += 0.015 * delta * (1.0 + pulse_intensity * 3.0)
 	pulse_intensity = max(0.0, pulse_intensity - 3.5 * delta)
