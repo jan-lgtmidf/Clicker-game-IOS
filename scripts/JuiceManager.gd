@@ -59,14 +59,14 @@ func trigger_flash(color: Color, duration: float) -> void:
 	tween.tween_property(flash_overlay, "color:a", 0.0, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 # Spawn juicy floating damage-style text popups with custom color coding
-func spawn_floating_text(parent: Node, global_pos: Vector2, text_val: String, is_crit: bool, custom_color: Color = Color.WHITE) -> void:
+func spawn_floating_text(parent: Node, global_pos: Vector2, text_val: String, is_crit: bool, custom_color: Color = Color.WHITE, combo: int = 1) -> void:
 	if not parent:
 		return
 		
 	var text_instance = floating_text_scene.instantiate()
 	text_instance.position = global_pos
 	parent.add_child(text_instance)
-	text_instance.init_text(text_val, is_crit, custom_color)
+	text_instance.init_text(text_val, is_crit, custom_color, combo)
 
 # Spawn glowing spark particle burst on button presses
 func spawn_spark_burst(parent: Node, global_pos: Vector2, color: Color) -> void:

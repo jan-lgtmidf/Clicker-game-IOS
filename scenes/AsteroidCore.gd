@@ -311,7 +311,9 @@ func trigger_click(click_pos: Vector2) -> void:
 	var is_crit = randf() <= GameManager.get_crit_chance()
 	var base_power = GameManager.get_click_power()
 	
-	var mined_ore = base_power
+	# Apply Click Combo Multiplier to ore yield (+10% per combo level, up to +100% at combo 10)
+	var combo_mult = 1.0 + float(click_combo) * 0.1
+	var mined_ore = base_power * combo_mult
 	if is_crit:
 		mined_ore *= GameManager.get_crit_multiplier()
 		
@@ -365,16 +367,16 @@ func trigger_click(click_pos: Vector2) -> void:
 		
 	particle_emitter.restart()
 	
-	# Spawning color-coded floating text popups
+	# Spawning color-coded floating text popups (with combo text sizing)
 	if is_crit:
-		JuiceManager.spawn_floating_text(self, click_pos, "CRIT! +" + str(int(mined_ore)) + " Ore", true, Color(1.0, 0.84, 0.0))
+		JuiceManager.spawn_floating_text(self, click_pos, "CRIT! +" + str(int(mined_ore)) + " Ore", true, Color(1.0, 0.84, 0.0), click_combo)
 	else:
-		JuiceManager.spawn_floating_text(self, click_pos, "+" + str(int(mined_ore)) + " Ore", false, Color(0.0, 0.94, 1.0))
+		JuiceManager.spawn_floating_text(self, click_pos, "+" + str(int(mined_ore)) + " Ore", false, Color(0.0, 0.94, 1.0), click_combo)
 		
 	if mined_gas > 0:
-		JuiceManager.spawn_floating_text(self, click_pos + Vector2(-50, -25), "+" + str(int(mined_gas)) + " Gas", false, Color(1.0, 0.0, 0.5))
+		JuiceManager.spawn_floating_text(self, click_pos + Vector2(-50, -25), "+" + str(int(mined_gas)) + " Gas", false, Color(1.0, 0.0, 0.5), click_combo)
 	if mined_crystals > 0:
-		JuiceManager.spawn_floating_text(self, click_pos + Vector2(50, -25), "+" + str(int(mined_crystals)) + " Crystal", true, Color(1.0, 0.84, 0.0))
+		JuiceManager.spawn_floating_text(self, click_pos + Vector2(50, -25), "+" + str(int(mined_crystals)) + " Crystal", true, Color(1.0, 0.84, 0.0), click_combo)
 
 func _on_mouse_entered() -> void:
 	is_hovered = true

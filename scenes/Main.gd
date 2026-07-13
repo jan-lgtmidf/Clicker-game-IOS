@@ -836,6 +836,9 @@ func _on_core_clicked(click_pos: Vector2, is_crit: bool, _ore_amount: float) -> 
 	if is_crit:
 		var color = Color(1.0, 0.84, 0.0)
 		$HUD/Background.trigger_critical_pulse(color)
+		# Satisfying feedback for crits: golden sparks and subtle camera shake
+		JuiceManager.shake_camera(4.0, 0.15)
+		JuiceManager.spawn_spark_burst(self, global_click_pos, Color(1.0, 0.84, 0.0))
 	
 	# Apply shockwave click ripples & dust repulsion vector lines
 	var color_to_pass = Color(1.0, 0.84, 0.0) if is_crit else Color(0.0, 0.94, 1.0)
