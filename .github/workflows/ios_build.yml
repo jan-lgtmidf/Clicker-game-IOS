@@ -32,6 +32,10 @@ jobs:
           mkdir -p ios
 
       - name: Export Godot iOS Project
+        env:
+          CODE_SIGNING_ALLOWED: "NO"
+          CODE_SIGNING_REQUIRED: "NO"
+          CODE_SIGN_IDENTITY: ""
         run: |
           /Applications/Godot.app/Contents/MacOS/Godot \
             --headless --path "." \
@@ -64,6 +68,7 @@ jobs:
             PRODUCT_BUNDLE_IDENTIFIER=com.jan.astroforge \
             ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
             SWIFT_VERSION=5.0 \
+            LIBRARY_SEARCH_PATHS='$(inherited) $(TOOLCHAIN_DIR)/usr/lib/swift/iphoneos $(SDKROOT)/usr/lib/swift' \
             clean build \
             SYMROOT=$(pwd)/build_output \
             2>&1 | tail -50
