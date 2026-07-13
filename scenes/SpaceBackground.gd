@@ -30,7 +30,7 @@ func _ready() -> void:
 	center = Vector2(270, 480)
 	
 	# Load custom background with dynamic fallback for editor/exported build compatibility
-	var bg_path = "res://assets/custom_background.png"
+	var bg_path = "res://assets/custom_background.jpg"
 	if FileAccess.file_exists(bg_path):
 		var img = Image.load_from_file(bg_path)
 		if img:
