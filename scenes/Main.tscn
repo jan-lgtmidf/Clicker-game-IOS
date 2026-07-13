@@ -277,6 +277,7 @@ theme_override_styles/panel = SubResource("StyleBoxPanel")
 [node name="UpgradesPanel" type="ScrollContainer" parent="HUD/VBoxContainer/PanelContainer"]
 layout_mode = 2
 horizontal_scroll_mode = 0
+scroll_deadzone = 12
 
 [node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/UpgradesPanel"]
 layout_mode = 2
@@ -287,17 +288,26 @@ theme_override_constants/separation = 8
 visible = false
 layout_mode = 2
 horizontal_scroll_mode = 0
+scroll_deadzone = 12
 
 [node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/AutomationPanel"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
-[node name="SkillTreePanel" type="Control" parent="HUD/VBoxContainer/PanelContainer"]
+[node name="SkillTreePanel" type="ScrollContainer" parent="HUD/VBoxContainer/PanelContainer"]
 visible = false
 layout_mode = 2
+horizontal_scroll_mode = 0
+scroll_deadzone = 12
 
-[node name="SkillLineDrawer" type="Control" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel"]
+[node name="SkillTreeContent" type="Control" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel"]
+custom_minimum_size = Vector2(0, 480)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="SkillLineDrawer" type="Control" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent"]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -305,14 +315,14 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("3_drawer")
 
-[node name="Nodes" type="Control" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel"]
+[node name="Nodes" type="Control" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent"]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="ore_magnet" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/Nodes"]
+[node name="ore_magnet" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/Nodes"]
 layout_mode = 0
 offset_left = 190.0
 offset_top = 20.0
@@ -321,7 +331,7 @@ offset_bottom = 80.0
 theme_override_font_sizes/font_size = 11
 text = "Ore Magnet"
 
-[node name="gas_igniter" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/Nodes"]
+[node name="gas_igniter" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/Nodes"]
 layout_mode = 0
 offset_left = 40.0
 offset_top = 140.0
@@ -330,7 +340,7 @@ offset_bottom = 200.0
 theme_override_font_sizes/font_size = 11
 text = "Gas Igniter"
 
-[node name="quantum_drill" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/Nodes"]
+[node name="quantum_drill" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/Nodes"]
 layout_mode = 0
 offset_left = 330.0
 offset_top = 140.0
@@ -339,7 +349,7 @@ offset_bottom = 200.0
 theme_override_font_sizes/font_size = 11
 text = "Quantum Drill"
 
-[node name="crystal_refiner" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/Nodes"]
+[node name="crystal_refiner" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/Nodes"]
 layout_mode = 0
 offset_left = 40.0
 offset_top = 260.0
@@ -348,7 +358,7 @@ offset_bottom = 320.0
 theme_override_font_sizes/font_size = 11
 text = "Crystal Refiner"
 
-[node name="cosmic_forge" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/Nodes"]
+[node name="cosmic_forge" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/Nodes"]
 layout_mode = 0
 offset_left = 190.0
 offset_top = 370.0
@@ -361,6 +371,7 @@ text = "Cosmic Forge"
 visible = false
 layout_mode = 2
 horizontal_scroll_mode = 0
+scroll_deadzone = 12
 
 [node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel"]
 layout_mode = 2
@@ -410,6 +421,7 @@ theme_override_constants/separation = 8
 visible = false
 layout_mode = 2
 horizontal_scroll_mode = 0
+scroll_deadzone = 12
 
 [node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/PrestigePanel"]
 layout_mode = 2

@@ -25,6 +25,11 @@ var target_percent: float = 0.0
 var pulse_time: float = 0.0
 
 func _ready() -> void:
+	if OS.has_feature("editor"):
+		print("Running in Editor. Bypassing OTA update system.")
+		get_tree().change_scene_to_file(MAIN_SCENE_PATH)
+		return
+
 	# 1. Setup satisfy-loading starfield programmatically
 	_setup_starfield()
 	

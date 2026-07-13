@@ -9,7 +9,7 @@ extends Control
 
 @onready var tab_upgrades: ScrollContainer = $HUD/VBoxContainer/PanelContainer/UpgradesPanel
 @onready var tab_automation: ScrollContainer = $HUD/VBoxContainer/PanelContainer/AutomationPanel
-@onready var tab_skilltree: Control = $HUD/VBoxContainer/PanelContainer/SkillTreePanel
+@onready var tab_skilltree: ScrollContainer = $HUD/VBoxContainer/PanelContainer/SkillTreePanel
 @onready var tab_singularity: ScrollContainer = $HUD/VBoxContainer/PanelContainer/SingularityPanel
 @onready var tab_prestige: ScrollContainer = $HUD/VBoxContainer/PanelContainer/PrestigePanel
 @onready var panels_container: PanelContainer = $HUD/VBoxContainer/PanelContainer
@@ -1202,7 +1202,7 @@ func _refresh_purchase_buttons() -> void:
 
 func setup_skill_tree_buttons() -> void:
 	for skill_id in GameManager.SKILL_CONFIG.keys():
-		var node_path = "HUD/VBoxContainer/PanelContainer/SkillTreePanel/Nodes/" + skill_id
+		var node_path = "HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/Nodes/" + skill_id
 		var btn = get_node_or_null(node_path)
 		if btn is Button:
 			for c in btn.pressed.get_connections():
@@ -1212,11 +1212,11 @@ func setup_skill_tree_buttons() -> void:
 
 func _on_skill_node_pressed(skill_id: String) -> void:
 	if GameManager.buy_skill(skill_id):
-		$HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillLineDrawer.queue_redraw()
+		$HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/SkillLineDrawer.queue_redraw()
 
 func _refresh_skill_nodes() -> void:
 	for skill_id in GameManager.SKILL_CONFIG.keys():
-		var node_path = "HUD/VBoxContainer/PanelContainer/SkillTreePanel/Nodes/" + skill_id
+		var node_path = "HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/Nodes/" + skill_id
 		var btn = get_node_or_null(node_path)
 		if btn is Button:
 			var config = GameManager.SKILL_CONFIG[skill_id]
@@ -1253,7 +1253,7 @@ func _refresh_skill_nodes() -> void:
 			btn.add_theme_stylebox_override("hover", btn_style)
 			btn.add_theme_stylebox_override("disabled", btn_style)
 			
-	var line_drawer = get_node_or_null("HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillLineDrawer")
+	var line_drawer = get_node_or_null("HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/SkillLineDrawer")
 	if line_drawer:
 		line_drawer.queue_redraw()
 
@@ -1362,6 +1362,7 @@ func _create_achievements_ui() -> void:
 	tab_achievements.anchors_preset = Control.LayoutPreset.PRESET_FULL_RECT
 	tab_achievements.horizontal_scroll_mode = ScrollContainer.ScrollMode.SCROLL_MODE_DISABLED
 	tab_achievements.vertical_scroll_mode = ScrollContainer.ScrollMode.SCROLL_MODE_AUTO
+	tab_achievements.scroll_deadzone = 12
 	tab_achievements.visible = false
 	panels_container.add_child(tab_achievements)
 	
