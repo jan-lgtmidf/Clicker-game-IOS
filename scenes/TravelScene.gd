@@ -10,23 +10,36 @@ signal travel_completed
 var warp_lines: Array = []
 var warp_speed: float = 800.0
 var travel_time: float = 0.0
+var pivot: Node3D = null
 
 func _ready() -> void:
 	# Hide mouse cursor during cinematic travel
 	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
 	
-	# Auto-scale the loaded 3D mesh to fit the viewport frame perfectly
+	# Auto-scale the loaded 3D mesh using a pivot Node3D to ensure centered rotation
 	if mesh_instance and mesh_instance.mesh:
 		var aabb = mesh_instance.mesh.get_aabb()
 		var max_dim = max(aabb.size.x, max(aabb.size.y, aabb.size.z))
 		if max_dim > 0.0:
-			var target_scale = 2.2 / max_dim
-			mesh_instance.scale = Vector3(target_scale, target_scale, target_scale)
-			# Center mesh at local 3D origin
+			var target_scale = 6.5 / max_dim
+			
+			# Create pivot Node3D
+			pivot = Node3D.new()
+			pivot.name = "ShipPivot"
+			$SubViewportContainer/SubViewport.add_child(pivot)
+			
+			# Reparent mesh_instance to pivot
+			mesh_instance.reparent(pivot)
+			
+			# Center mesh at pivot's local origin
 			var center = aabb.position + aabb.size / 2.0
-			mesh_instance.position = -center * target_scale
-			# Orient ship so it looks cool (slight downward tilt for warp feel)
-			mesh_instance.rotation_degrees = Vector3(-15, 180, 0)
+			mesh_instance.position = -center
+			mesh_instance.scale = Vector3.ONE
+			mesh_instance.rotation = Vector3.ZERO
+			
+			# Scale and rotate the pivot
+			pivot.scale = Vector3(target_scale, target_scale, target_scale)
+			pivot.rotation_degrees = Vector3(-15, 180, 0)
 			
 		# Override the voxel palette material with a vivid neon material so the ship is VISIBLE
 		var mat = StandardMaterial3D.new()
@@ -37,6 +50,11 @@ func _ready() -> void:
 		mat.emission = Color(0.0, 0.6, 1.0)        # Neon cyan self-glow
 		mat.emission_energy_multiplier = 1.8
 		mesh_instance.set_surface_override_material(0, mat)
+		
+	# Ensure camera is current and looks at the pivot origin (the ship center)
+	if camera:
+		camera.current = true
+		camera.look_at(Vector3.ZERO, Vector3.UP)
 		
 	# Add extra bright OmniLight inside the SubViewport
 	var sub_vp = $SubViewportContainer/SubViewport
@@ -53,7 +71,6 @@ func _ready() -> void:
 	light2.light_color = Color(1.0, 0.5, 0.8)   # Pink rim light
 	light2.omni_range = 15.0
 	sub_vp.add_child(light2)
-			
 	# Generate initial warp lines
 	for i in range(30):
 		_spawn_warp_line(true)
@@ -88,12 +105,12 @@ func _spawn_warp_line(random_x: bool = false) -> void:
 func _process(delta: float) -> void:
 	travel_time += delta
 	
-	# Slowly rotate mesh to show off the 3D spaceship model
-	if mesh_instance:
-		mesh_instance.rotate_y(delta * 1.5)
-		mesh_instance.rotate_x(delta * 0.3)
-		# Engine visual vibration displacement
-		mesh_instance.position.y += sin(travel_time * 25.0) * 0.02 * delta
+	# Slowly rotate pivot to show off the 3D spaceship model
+	if pivot:
+		pivot.rotate_y(delta * 1.5)
+		pivot.rotate_x(delta * 0.3)
+		# Engine visual vibration displacement (oscillates around Y = 0)
+		pivot.position.y = sin(travel_time * 25.0) * 0.005
 		
 	# Update warp lines
 	var active_lines = []

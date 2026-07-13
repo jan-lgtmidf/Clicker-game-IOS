@@ -21,6 +21,7 @@ var achievements_tab_btn: Button
 var sector_progress_bar: ProgressBar
 var travel_btn: Button
 var sector_label: Label
+var _pending_travel_node_id: String = ""
 
 @onready var upgrades_list: VBoxContainer = $HUD/VBoxContainer/PanelContainer/UpgradesPanel/VBox
 @onready var automation_list: VBoxContainer = $HUD/VBoxContainer/PanelContainer/AutomationPanel/VBox
@@ -265,6 +266,8 @@ func _process_supernova(delta: float) -> void:
 		if GameManager.is_achievement_unlocked("supernova_10"):
 			mult += 0.05
 		duration = (duration + float(stab_lvl) * 0.45) * mult
+		if GameManager.get_current_sector_type() == "anomaly":
+			duration *= 0.8
 		
 		var progress = min(1.0, supernova_alert_elapsed / duration)
 		var ring_scale = lerp(2.6, 1.0, progress)
@@ -396,7 +399,10 @@ func _process_comets_and_drones(delta: float) -> void:
 		# pull upgrades: comets spawn 10% faster per level
 		var pull_lvl = GameManager.singularity_upgrades.get("gravitational_pull", 0)
 		var rate_mult = 1.0 - float(pull_lvl) * 0.10
-		next_comet_time = randf_range(45.0, 60.0) * max(0.5, rate_mult)
+		var sector_mult = 1.0
+		if GameManager.get_current_sector_type() == "anomaly":
+			sector_mult = 0.5
+		next_comet_time = randf_range(45.0, 60.0) * max(0.5, rate_mult) * sector_mult
 		spawn_cosmic_comet()
 		
 	var core_pos = $HUD/VBoxContainer/CoreContainer/AsteroidCore.global_position + Vector2(150, 150)
@@ -906,7 +912,8 @@ func _update_all_labels() -> void:
 	# Update Sector Progress Bar & Label
 	if sector_progress_bar:
 		var target = GameManager.get_sector_target()
-		sector_label.text = "SEKTOR: %d" % GameManager.current_sector
+		var node_name = GameManager.get_current_sector_node().get("name", "Sternenwiege")
+		sector_label.text = "SEKTOR: %s" % node_name.to_upper()
 		sector_progress_bar.max_value = target
 		sector_progress_bar.value = clamp(GameManager.space_ore, 0.0, target)
 		
@@ -1892,10 +1899,15 @@ func _create_sector_ui() -> void:
 	vbox.add_child(sector_label)
 	vbox.move_child(sector_label, 2)
 	
+	var sector_hbox = HBoxContainer.new()
+	sector_hbox.name = "SectorHBox"
+	sector_hbox.add_theme_constant_override("separation", 6)
+	
 	sector_progress_bar = ProgressBar.new()
 	sector_progress_bar.name = "SectorProgressBar"
-	sector_progress_bar.custom_minimum_size = Vector2(0, 12)
+	sector_progress_bar.custom_minimum_size = Vector2(0, 14)
 	sector_progress_bar.layout_mode = 2
+	sector_progress_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sector_progress_bar.show_percentage = true
 	sector_progress_bar.add_theme_font_size_override("font_size", 9)
 	
@@ -1927,12 +1939,43 @@ func _create_sector_ui() -> void:
 	sector_progress_bar.add_theme_stylebox_override("background", pbar_bg)
 	sector_progress_bar.add_theme_stylebox_override("fill", pbar_fill)
 	
-	vbox.add_child(sector_progress_bar)
-	vbox.move_child(sector_progress_bar, 3)
+	sector_hbox.add_child(sector_progress_bar)
+	
+	var map_btn = Button.new()
+	map_btn.name = "MapBtn"
+	map_btn.text = "KARTE"
+	map_btn.custom_minimum_size = Vector2(60, 20)
+	map_btn.layout_mode = 2
+	map_btn.add_theme_font_size_override("font_size", 9)
+	
+	var map_btn_style = StyleBoxFlat.new()
+	map_btn_style.bg_color = Color(0.06, 0.04, 0.12, 0.9)
+	map_btn_style.border_width_left = 1
+	map_btn_style.border_width_right = 1
+	map_btn_style.border_width_top = 1
+	map_btn_style.border_width_bottom = 1
+	map_btn_style.border_color = Color(0.0, 0.94, 1.0, 0.8)
+	map_btn_style.corner_radius_top_left = 4
+	map_btn_style.corner_radius_top_right = 4
+	map_btn_style.corner_radius_bottom_right = 4
+	map_btn_style.corner_radius_bottom_left = 4
+	
+	var map_btn_hover = map_btn_style.duplicate()
+	map_btn_hover.bg_color = Color(0.1, 0.06, 0.2, 0.95)
+	map_btn_hover.border_color = Color(1.0, 0.0, 0.5, 1.0)
+	
+	map_btn.add_theme_stylebox_override("normal", map_btn_style)
+	map_btn.add_theme_stylebox_override("hover", map_btn_hover)
+	map_btn.pressed.connect(_on_map_btn_pressed)
+	
+	sector_hbox.add_child(map_btn)
+	
+	vbox.add_child(sector_hbox)
+	vbox.move_child(sector_hbox, 3)
 	
 	travel_btn = Button.new()
 	travel_btn.name = "TravelBtn"
-	travel_btn.text = "REISE ZUM NÄCHSTEN SEKTOR"
+	travel_btn.text = "STERNENKARTE ÖFFNEN"
 	travel_btn.visible = false
 	travel_btn.custom_minimum_size = Vector2(220, 42)
 	travel_btn.layout_mode = 1
@@ -1973,7 +2016,7 @@ func _create_sector_ui() -> void:
 	travel_btn.add_theme_stylebox_override("pressed", btn_style)
 	travel_btn.add_theme_font_size_override("font_size", 11)
 	
-	travel_btn.pressed.connect(_on_travel_pressed)
+	travel_btn.pressed.connect(_on_map_btn_pressed)
 	$HUD.add_child(travel_btn)
 
 func _bounce_button(btn: Button) -> void:
@@ -1985,33 +2028,62 @@ func _bounce_button(btn: Button) -> void:
 	t.tween_property(btn, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	t.finished.connect(func(): _bounce_button(btn))
 
-func _on_travel_pressed() -> void:
+func _on_map_btn_pressed() -> void:
+	if $HUD.has_node("StarMapModal"):
+		return
+		
+	var map_modal_scene = load("res://scenes/StarMapModal.tscn")
+	if map_modal_scene:
+		var modal = map_modal_scene.instantiate()
+		modal.name = "StarMapModal"
+		modal.jump_initiated.connect(_on_jump_initiated)
+		$HUD.add_child(modal)
+
+func _on_jump_initiated(target_node_id: String) -> void:
+	_pending_travel_node_id = target_node_id
 	var travel_scene_path = "res://scenes/TravelScene.tscn"
 	if ResourceLoader.exists(travel_scene_path):
 		var ts_scene = load(travel_scene_path)
 		var ts_instance = ts_scene.instantiate()
 		add_child(ts_instance)
 		ts_instance.travel_completed.connect(_on_travel_completed)
-		$HUD/VBoxContainer.visible = false
+		$HUD.visible = false
 
 func _on_travel_completed() -> void:
-	$HUD/VBoxContainer.visible = true
-	GameManager.current_sector += 1
+	$HUD.visible = true
+	
+	if _pending_travel_node_id != "":
+		# If it's a new node, add it to unlocked nodes list
+		if not GameManager.unlocked_sector_nodes.has(_pending_travel_node_id):
+			GameManager.unlocked_sector_nodes.append(_pending_travel_node_id)
+			
+		GameManager.current_sector_node_id = _pending_travel_node_id
+		GameManager.current_sector = GameManager.unlocked_sector_nodes.size()
+		_pending_travel_node_id = ""
+		
+	# Update SpaceBackground dynamically
+	var bg_node = $HUD.get_node_or_null("Background")
+	if bg_node and bg_node.has_method("load_sector_background"):
+		bg_node.load_sector_background(GameManager.current_sector_node_id)
+		
 	GameManager.space_ore = 0.0
 	
 	var core_node = $HUD/VBoxContainer/CoreContainer/AsteroidCore
 	if core_node:
-		var rng = RandomNumberGenerator.new()
-		rng.randomize()
-		var colors = [
-			Color(0.0, 0.94, 1.0),   # Cyan
-			Color(1.0, 0.0, 0.5),   # Pink
-			Color(1.0, 0.84, 0.0),  # Gold
-			Color(0.22, 1.0, 0.08), # Neon Green
-			Color(0.7, 0.2, 1.0)    # Neon Purple
-		]
-		core_node.border_color = colors[rng.randi() % colors.size()]
-		core_node.glow_color = core_node.border_color
+		var node_type = GameManager.get_current_sector_type()
+		var sector_color = Color(0.0, 0.94, 1.0) # default Cyan
+		match node_type:
+			"ore":
+				sector_color = Color(0.95, 0.45, 0.1) # Orange
+			"gas":
+				sector_color = Color(0.2, 0.9, 0.4) # Green/Cyan
+			"crystal":
+				sector_color = Color(0.9, 0.2, 0.7) # Pink/Magenta
+			"anomaly":
+				sector_color = Color(0.95, 0.1, 0.1) # Red
+				
+		core_node.border_color = sector_color
+		core_node.glow_color = sector_color
 		core_node.glow_color.a = 0.25
 		
 		core_node.generate_asteroid_shape()
@@ -2019,7 +2091,8 @@ func _on_travel_completed() -> void:
 	_update_all_labels()
 	GameManager.save_game()
 	
-	JuiceManager.spawn_floating_text(self, Vector2(270, 480), "SEKTOR %d ERREICHT!" % GameManager.current_sector, true, Color(1.0, 0.84, 0.0), 3)
+	var node_name = GameManager.get_current_sector_node().get("name", "Unbekannt")
+	JuiceManager.spawn_floating_text(self, Vector2(270, 480), "%s ERREICHT!" % node_name.to_upper(), true, Color(1.0, 0.84, 0.0), 3)
 
 # ----------------- INNER CLASSES -----------------
 

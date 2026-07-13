@@ -44,10 +44,105 @@ var lifetime_space_ore: float = 0.0
 var lifetime_stardust: float = 0.0
 
 var current_sector: int = 1
+var current_sector_node_id: String = "1"
+var unlocked_sector_nodes: Array = ["1"]
+
+const STAR_MAP_NODES: Dictionary = {
+	"1": {
+		"name": "Sternenwiege",
+		"type": "normal",
+		"level": 1,
+		"pos": Vector2(200, 680),
+		"conns": ["2", "3"],
+		"bonus_desc": "Keine anomalen Effekte. Basis-Schürfgebiet."
+	},
+	"2": {
+		"name": "Helium-Schleier",
+		"type": "gas",
+		"level": 2,
+		"pos": Vector2(90, 530),
+		"conns": ["1", "4", "5"],
+		"bonus_desc": "+60% Gas-Gewinnung."
+	},
+	"3": {
+		"name": "Erz-Gürtel Alpha",
+		"type": "ore",
+		"level": 2,
+		"pos": Vector2(310, 530),
+		"conns": ["1", "5", "6"],
+		"bonus_desc": "+60% Erz-Gewinnung."
+	},
+	"4": {
+		"name": "Quanten-Riff",
+		"type": "crystal",
+		"level": 3,
+		"pos": Vector2(50, 380),
+		"conns": ["2", "7"],
+		"bonus_desc": "+20% Krit-Chance auf Klicks."
+	},
+	"5": {
+		"name": "Instabile Anomalie",
+		"type": "anomaly",
+		"level": 3,
+		"pos": Vector2(200, 380),
+		"conns": ["2", "3", "7", "8"],
+		"bonus_desc": "2x Kometen-Frequenz, aber 20% kürzeres Reaktorsicherheitsfenster."
+	},
+	"6": {
+		"name": "Titan-Schlot",
+		"type": "ore",
+		"level": 3,
+		"pos": Vector2(350, 380),
+		"conns": ["3", "8"],
+		"bonus_desc": "+60% Erz-Gewinnung."
+	},
+	"7": {
+		"name": "Plasma-Sturm",
+		"type": "gas",
+		"level": 4,
+		"pos": Vector2(90, 230),
+		"conns": ["4", "5", "11"],
+		"bonus_desc": "+60% Gas-Gewinnung."
+	},
+	"8": {
+		"name": "Kristall-Hort",
+		"type": "crystal",
+		"level": 4,
+		"pos": Vector2(310, 230),
+		"conns": ["5", "6", "11"],
+		"bonus_desc": "+20% Krit-Chance auf Klicks."
+	},
+	"11": {
+		"name": "Singularitäts-Riss",
+		"type": "anomaly",
+		"level": 5,
+		"pos": Vector2(200, 100),
+		"conns": ["7", "8", "12"],
+		"bonus_desc": "2x Kometen-Frequenz, aber 20% kürzeres Reaktorsicherheitsfenster."
+	},
+	"12": {
+		"name": "Ereignishorizont",
+		"type": "normal",
+		"level": 6,
+		"pos": Vector2(200, 20),
+		"conns": ["11"],
+		"bonus_desc": "Das Epizentrum der Singularität."
+	}
+}
+
+func get_current_sector_node() -> Dictionary:
+	if STAR_MAP_NODES.has(current_sector_node_id):
+		return STAR_MAP_NODES[current_sector_node_id]
+	return STAR_MAP_NODES["1"]
+
+func get_current_sector_type() -> String:
+	var node = get_current_sector_node()
+	return node.get("type", "normal")
 
 func get_sector_target() -> float:
-	var safe_sector = max(1, current_sector)
-	return 1000.0 * pow(5.0, float(safe_sector - 1))
+	var node = get_current_sector_node()
+	var level = node.get("level", 1)
+	return 1000.0 * pow(5.0, float(level - 1))
 
 # Stats tracking for achievements
 var stats: Dictionary = {
@@ -398,6 +493,8 @@ func get_crit_chance() -> float:
 		base += 0.01
 	if equipped_artifacts.has("dark_matter_mirror"):
 		base += 0.15
+	if get_current_sector_type() == "crystal":
+		base += 0.20
 	return min(0.65, base)
 
 func get_crit_multiplier() -> float:
@@ -429,12 +526,16 @@ func get_production_rate(id: String) -> float:
 				mult += 0.30
 			if is_achievement_unlocked("ore_1k"):
 				mult += 0.01
+			if get_current_sector_type() == "ore":
+				mult += 0.60
 		"siphon":
 			base_rate = lvl * 0.4
 			if unlocked_skills.has("gas_igniter"):
 				mult += 0.20
 			if is_achievement_unlocked("gas_100"):
 				mult += 0.01
+			if get_current_sector_type() == "gas":
+				mult += 0.60
 		"synthesizer":
 			base_rate = lvl * 0.1
 			
@@ -446,8 +547,9 @@ func get_global_production_multiplier() -> float:
 	if is_achievement_unlocked("comets_10"):
 		mult += 0.05
 	
-	# Sektor global production multiplier (+50% per sector beyond 1)
-	mult += float(current_sector - 1) * 0.5
+	# Sektor global production multiplier (+50% per unique sector visited)
+	var unique_visited = unlocked_sector_nodes.size()
+	mult += float(unique_visited - 1) * 0.5
 	
 	if equipped_artifacts.has("crystal_amplifier"):
 		mult += 0.25
@@ -629,6 +731,8 @@ func trigger_prestige() -> bool:
 	
 	# Reset sector back to 1 on prestige
 	current_sector = 1
+	current_sector_node_id = "1"
+	unlocked_sector_nodes = ["1"]
 	
 	game_reset.emit()
 	stats_changed.emit()
@@ -681,6 +785,8 @@ func hard_reset() -> void:
 	
 	# Reset sector
 	current_sector = 1
+	current_sector_node_id = "1"
+	unlocked_sector_nodes = ["1"]
 	
 	# Reset artifacts
 	unlocked_artifacts.clear()
@@ -826,6 +932,8 @@ func save_game() -> void:
 	config.set_value("resources", "lifetime_space_ore", lifetime_space_ore)
 	config.set_value("resources", "lifetime_stardust", lifetime_stardust)
 	config.set_value("resources", "current_sector", current_sector)
+	config.set_value("resources", "current_sector_node_id", current_sector_node_id)
+	config.set_value("resources", "unlocked_sector_nodes", unlocked_sector_nodes)
 	
 	# Upgrades
 	for up_id in upgrade_levels.keys():
@@ -875,6 +983,21 @@ func load_game() -> void:
 	lifetime_space_ore = float(config.get_value("resources", "lifetime_space_ore", 0.0))
 	lifetime_stardust = float(config.get_value("resources", "lifetime_stardust", 0.0))
 	current_sector = max(1, int(config.get_value("resources", "current_sector", 1)))
+	current_sector_node_id = str(config.get_value("resources", "current_sector_node_id", "1"))
+	
+	var loaded_nodes = config.get_value("resources", "unlocked_sector_nodes", ["1"])
+	if typeof(loaded_nodes) == TYPE_ARRAY:
+		unlocked_sector_nodes = loaded_nodes
+	else:
+		unlocked_sector_nodes = ["1"]
+		
+	# Migration logic: if they have current_sector > unlocked_sector_nodes.size(), populate it
+	if current_sector > unlocked_sector_nodes.size():
+		unlocked_sector_nodes = []
+		var ordered_keys = ["1", "2", "3", "4", "5", "6", "7", "8", "11", "12"]
+		for i in range(min(current_sector, ordered_keys.size())):
+			unlocked_sector_nodes.append(ordered_keys[i])
+		current_sector_node_id = unlocked_sector_nodes[unlocked_sector_nodes.size() - 1]
 	
 	# Upgrades validation against active keys
 	var default_upgrades = {

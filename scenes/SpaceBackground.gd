@@ -35,6 +35,41 @@ const NUM_DUST = 30
 # Click Ripple Rings (glowing expanding shockwaves)
 var ripples: Array = []
 
+func load_sector_background(node_id: String) -> void:
+	var path = "res://assets/Backgrounds/bg_sector_" + node_id + ".jpg"
+	var loaded = false
+	
+	if FileAccess.file_exists(path):
+		var img = Image.load_from_file(path)
+		if img:
+			bg_tex = ImageTexture.create_from_image(img)
+			loaded = true
+			
+	# Dynamic load fallback (for export builds and editor assets)
+	if not loaded and ResourceLoader.exists(path):
+		bg_tex = load(path)
+		loaded = true
+		
+	if not loaded:
+		# Fallback to the original background
+		var fallback_path = "res://assets/custom_background.jpg"
+		if FileAccess.file_exists(fallback_path):
+			var img = Image.load_from_file(fallback_path)
+			if img:
+				bg_tex = ImageTexture.create_from_image(img)
+				loaded = true
+				
+		if not loaded and ResourceLoader.exists(fallback_path):
+			bg_tex = load(fallback_path)
+			loaded = true
+			
+		if not loaded:
+			var default_fallback = "res://assets/Kenney/kenney_space-shooter-remastered/Backgrounds/darkPurple.png"
+			if ResourceLoader.exists(default_fallback):
+				bg_tex = load(default_fallback)
+				
+	queue_redraw()
+
 func _ready() -> void:
 	# Disable minimum size constraint to stretch freely
 	custom_minimum_size = Vector2.ZERO
@@ -51,20 +86,8 @@ func _ready() -> void:
 	
 	center = size / 2.0
 	
-	# Load custom background with dynamic fallback for editor/exported build compatibility
-	var bg_path = "res://assets/custom_background.jpg"
-	if FileAccess.file_exists(bg_path):
-		var img = Image.load_from_file(bg_path)
-		if img:
-			bg_tex = ImageTexture.create_from_image(img)
-			
-	if not bg_tex and ResourceLoader.exists(bg_path):
-		bg_tex = load(bg_path)
-		
-	if not bg_tex:
-		var fallback_path = "res://assets/Kenney/kenney_space-shooter-remastered/Backgrounds/darkPurple.png"
-		if ResourceLoader.exists(fallback_path):
-			bg_tex = load(fallback_path)
+	# Load current sector background
+	load_sector_background(GameManager.current_sector_node_id)
 	
 	var rng = RandomNumberGenerator.new()
 	rng.seed = 77
