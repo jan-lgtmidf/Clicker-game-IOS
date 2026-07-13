@@ -47,21 +47,18 @@ Drei freischaltbare Zauber bieten temporäre strategische Vorteile (mit individu
 
 ## 🗺️ Roadmap & Zukünftige Module
 
-### Phase 1–7 (Abgeschlossen)
-*   [x] Basissysteme (Klick, Erz, Layout)
-*   [x] Game Juice & JuiceManager (Partikel, Shakes, Elastic-Core)
-*   [x] Shop & Automation (Bohrer, Siphons, Kristalle)
-*   [x] Speichern & Laden (ConfigFile-System, Offline-Earnings)
-*   [x] Prestige-Reset & Talentbaum (Sternenstaub, Linienzeichner)
-*   [x] Audio-Synthesis & Musik-Crossfades (SoundManager-Akkorde)
-*   [x] Kenney Grafik-Overhaul (Planeten, UFOs, Raumschiffe, Partikel)
-*   [x] **GitHub Actions iOS Build → .ipa → auf echtem iPhone getestet ✅**
+### Abgeschlossene Meilensteine (Phasen 1–9)
+*   [x] **Basissysteme & Wirtschaft:** Klick-Mechanik, Erz, Gas, Kristalle, Prestige (Stardust), Singularität (Dark Matter).
+*   [x] **Game Juice & Sound:** Real-time Synthesizer Pads, Fades, dynamic camera effects (shake, flash), ripples, floating texts.
+*   [x] **Savegame & OTA-Update:** iOS Build (.ipa) Workflow, Auto-Hot-Reload von Autoloads.
+*   [x] **Sektoren-System & 3D Reise-Cutscene:** Sektor-Boni (+50% global), 3D-Spaceship Hyperraum Reise (MeshInstance3D, SubViewport).
+*   [x] **Visuelle Upgrades:** Combofieber (Subtile Neon-Blitze & Glow), physische abplatzende Gesteinstrümmer, Parallax-Background.
+*   [x] **Interaktive Bedrohungen:** Reaktor-Kernschmelze Minigame mit Bouncing Plasma-Bubbles.
+*   *   [x] **Bergbau-Drohnen & Artefakte:** Orbitale Laserdrohnen, Kometen-Loot-Drops, Inventarsystem für ausgerüstete Artefakt-Buffs.
 
 ### Neue Module in Planung (Nächste Schritte)
-1.  **Modul 8A — Errungenschaften & Erfolge (Achievements):** Lokale Medaillen, die für Meilensteine (Klicks, Kometen, Währung) vergeben werden und dauerhafte Mini-Buffs freischalten.
-2.  **Modul 8B — Kosmische Anomalie-Events:** Zufällige globale Phänomene (z.B. *Kristallschauer*, *Quantenfluktuationen*), die temporäre, massive Boni bieten und den Screen einfärben.
-3.  **Modul 8C — Erweiterte Automation & Drohnen-Typen:** Neue Drohnen-Klassen, wie Sammler-Drohnen, die Kometen abfangen oder Buff-Kristalle einsammeln.
-4.  **Modul 8D — Forge-Statistiken:** Ein neues Menüfenster mit detaillierten Messwerten über den aktuellen Run und die gesamte Spielhistorie.
+1.  **Modul 10A — Kosmische Anomalie-Events:** Zufällige globale Phänomene (z.B. *Kristallschauer*, *Quantenfluktuationen*), die temporäre, massive Boni bieten und den Screen einfärben.
+2.  **Modul 10B — Forge-Statistiken:** Ein neues Menüfenster mit detaillierten Messwerten über den aktuellen Run und die gesamte Spielhistorie.
 
 ---
 

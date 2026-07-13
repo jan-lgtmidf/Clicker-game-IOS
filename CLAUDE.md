@@ -31,6 +31,8 @@ Clicker game/
 │   ├── AsteroidCore.tscn
 │   ├── AsteroidCore.gd                 ← Kern-Interaktion, Squash & Stretch, Supernova-Ring
 │   ├── SkillLineDrawer.gd              ← Zeichnet Talentverbindungen (Draw-Liniengitter)
+│   ├── TravelScene.tscn                ← 3D/2D-Sektor-Reise Cutscene (SubViewport, MeshInstance3D)
+│   ├── TravelScene.gd                  ← 3D-Mesh Skalierung, Neon-Material, Warp-Animation
 │   ├── FloatingText.tscn
 │   └── FloatingText.gd                 ← Schwebender "+N" Text mit Drift und Fade
 └── scripts/
@@ -65,7 +67,7 @@ Main.tscn (Control)
 ## 🧠 GameManager — Datenstruktur & API
 `GameManager.gd` ist als Autoload (`GameManager`) registriert. Alle Werte sind typisiert.
 
-### Ressourcentracker:
+### Ressourcentracker & Sektoren:
 * `space_ore` (Erz)
 * `cosmic_gas` (Gas)
 * `star_crystals` (Kristalle)
@@ -73,6 +75,17 @@ Main.tscn (Control)
 * `dark_matter` (Dunkle Materie - Singularity)
 * `stardust_invested` (Investierter Sternenstaub)
 * `lifetime_space_ore` / `lifetime_stardust`
+* `current_sector` (Aktueller Sektor, startet bei 1)
+
+### Artefakt-System:
+* `unlocked_artifacts` (Array freigeschalteter Artefakt-IDs)
+* `equipped_artifacts` (Array ausgerüsteter Artefakt-IDs, max. 2)
+* `ARTIFACTS_CONFIG` (Boni-Konfiguration):
+  * `dark_matter_mirror` (+15% Krit-Chance, erhöht Krit-Cap auf 65%)
+  * `crystal_amplifier` (+25% globale passive Produktion)
+  * `grav_anchor` (Meltdown-Kühlphase dauert 3 Sek. länger / mehr Zeit zum Entschärfen)
+  * `pulse_generator` (+30% Klick-Basis-Stärke)
+  * `cosmic_collector` (+40% Ertrag durch automatische Bergbau-Drohnen)
 
 ### Upgrade-Kategorien:
 * `upgrade_levels`:
@@ -101,21 +114,28 @@ Main.tscn (Control)
 
 ## ⚡ Core-Systeme & Gameloop-Details
 
-### 1. Klick- & Juice-System
+### 1. Klick-, Combo- & Juice-System
 * **Kern:** `AsteroidCore.gd` nutzt ein elastisches Spring-Interpolationsmodell für Klicks.
-* **Krit-Klick:** Prüft `crit_chance`. Erzeugt einen doppelten/kritischen Float-Text (Gold, größer, mit "!") und wirft Kristalle ab, wenn das Talent `crystal_refiner` freigeschaltet ist.
-* **Ripples & Dust:** `SpaceBackground.gd` berechnet bei jedem Klick eine Repulsionskraft auf 30 Staubpartikel. Gleichzeitig breiten sich farbkodierte Vektor-Kreise (Ripples) aus.
+* **Combofieber (Visuell):** Steigt durch fortlaufende Klicks (max. 10). Bei x5+ Combo entsteht ein zarter Neon-Glow und ein pulsierender Ring. Bei x10 Combo zuckt ein dezenter Blitz und kritische Klicks lösen einen Kamerashake aus. 
+* **Physikalische Klick-Brocken:** Bei Klick spawnen in `SpaceBackground.gd` Gesteinstrümmer (Kenney-Sprites), die sich durch Schwerkraft nach unten bewegen, rotieren und langsam ausfaden.
+* **Krit-Klick:** Prüft `crit_chance`. Erzeugt goldenen Float-Text ("CRIT!"), vergoldete Gesteinsbrocken und wirft Kristalle ab, wenn das Talent `crystal_refiner` aktiv ist.
+* **Ripples & Parallax-Hintergrund:** Farbkodierte Klickringe breiten sich aus. Der Nebelhintergrund und die Sternenebenen verschieben sich mit einem Parallax-Tiefeneffekt relativ zur Mausposition.
 
-### 2. Kometen & Meltdown-Events
-* **Kometen:** Spawnen zufällig am oberen Bildschirmrand. Klicken bringt Bonus-Erz/Kristalle.
-* **Reaktor-Supernova:** Alle 75–90s droht eine Supernova. Der Spieler muss den Kern klicken, um Energie zu absorbieren (Containment).
-* **Meltdown:** Schlägt das Containment fehl, tritt eine Kernschmelze ein: Alle Automatisierungen gehen für 6 Sekunden offline.
+### 2. Kometen, Drohnen & Meltdown-Events
+* **Kometen:** Spawnen zufällig, bringen Ressourcen und haben eine Chance von 25%, ein gesperrtes kosmisches Artefakt fallenzulassen.
+* **Bergbau-Drohnen:** Fliegen in berechneten elliptischen Orbits um den Kern und feuern im Takt neonfarbene Doppel-Linienlaser ab, die den Kern elastisch eindrücken und Ressourcen generieren.
+* **Reaktor-Supernova & Plasma-Bubbles:** Alle 75–90s droht eine Supernova. Der Spieler muss den Kern klicken. Schlägt dies fehl, spawnen 5 physikalisch springende "Plasma-Bubbles". Der Spieler muss diese anklicken, um sie zu zerstören und den Reaktor abzukühlen. Gelingt dies nicht rechtzeitig, verfällt die Forge in eine 6-sekündige Kernschmelze (Automatisierung offline).
 
-### 3. Synthesized Sound & Music
+### 3. Sektorenreise-Cutscene & 3D-Viewport
+* **Ablauf:** Sobald die Sektor-Ressourcengrenze erreicht ist, kann der Sektor gewechselt werden.
+* **TravelScene:** Lädt das 3D-Modell `InterstellarRunner.obj` in einem `SubViewport` mit transparenter Renderung. Zur Laufzeit wird die Voxel-Farbpalette durch ein leuchtendes Neon-Cyan Material mit Emission (Stärke 1.8) und Rim-Lighting (pinker Streiflicht-Strahler) ersetzt. Das Schiff vibriert, fliegt von links ein und springt per Hyperraum-Warp-Linien nach rechts weg.
+* **Speicherschutz:** Bei Sektor-Erreichen oder Hard-Reset wird der Sektor-Zähler im Savegame sicherheitsgeprüft (`max(1, current_sector)`) und repariert.
+
+### 4. Synthesized Sound & Music
 * **Music Pad:** `SoundManager.gd` synthetisiert Akkorde in Echtzeit.
 * **Dynamischer Fader:** Die Musik wechselt stufenlos zwischen `normal` (Dur-Akkord), `overdrive` (heller Sound) und `meltdown` (tiefer, verzerrter Alarm-Moll-Akkord).
 
-### 4. Savegame & Offline-Ertrag
+### 5. Savegame & Offline-Ertrag
 * Speichert unter `user://savegame.save` via `ConfigFile`.
 * Berechnet Offline-Erträge mit 60% Effizienz (Capped bei 12 Std.).
 
