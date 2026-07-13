@@ -11,7 +11,7 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Xcode 16
+      - name: Setup Xcode 16.2
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '16.2'
@@ -37,10 +37,6 @@ jobs:
           mkdir -p ios
 
       - name: Export Godot iOS Project
-        env:
-          CODE_SIGNING_ALLOWED: "NO"
-          CODE_SIGNING_REQUIRED: "NO"
-          CODE_SIGN_IDENTITY: ""
         run: |
           /Applications/Godot.app/Contents/MacOS/Godot \
             --headless --path "." \
@@ -49,10 +45,11 @@ jobs:
             echo "Export failed!"
             exit 1
           fi
-          # Failsafe: Remove any automatic signing overrides in the project file
-          sed -i '' 's/CODE_SIGN_IDENTITY = "Apple Distribution"/CODE_SIGN_IDENTITY = "-"/g' ios/AstroForge.xcodeproj/project.pbxproj || true
-          sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = "Apple Distribution"/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = "-"/g' ios/AstroForge.xcodeproj/project.pbxproj || true
-          sed -i '' 's/DEVELOPMENT_TEAM = [A-Za-z0-9]*/DEVELOPMENT_TEAM = ""/g' ios/AstroForge.xcodeproj/project.pbxproj || true
+          # Fix: Replace Apple Distribution signing that Godot hardcodes with ad-hoc
+          sed -i '' 's/CODE_SIGN_IDENTITY = "Apple Distribution";/CODE_SIGN_IDENTITY = "-";/g' ios/AstroForge.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = "Apple Distribution";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "-";/g' ios/AstroForge.xcodeproj/project.pbxproj
+          # Clear Development Team to avoid provisioning conflicts
+          sed -i '' 's/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = "";/g' ios/AstroForge.xcodeproj/project.pbxproj
           echo "✅ Export OK"
 
       - name: Build Xcode Project
@@ -62,11 +59,6 @@ jobs:
             | grep -A20 'Schemes:' | grep -v 'Schemes:' | grep -v '^$' | head -1 | xargs)
           [ -z "$SCHEME" ] && SCHEME="AstroForge"
           echo "Building scheme: $SCHEME"
-
-          # Resolve SDK and Toolchain paths to absolute paths
-          DEVELOPER_DIR=$(xcode-select -p)
-          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
-          TOOLCHAIN_PATH="$DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain"
 
           xcodebuild \
             -project AstroForge.xcodeproj \
@@ -82,30 +74,28 @@ jobs:
             PRODUCT_BUNDLE_IDENTIFIER=com.jan.astroforge \
             ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
             SWIFT_VERSION=5.0 \
-            LIBRARY_SEARCH_PATHS="$(pwd) $TOOLCHAIN_PATH/usr/lib/swift/iphoneos $SDK_PATH/usr/lib/swift" \
             clean build \
-            SYMROOT=$(pwd)/build_output \
-            2>&1 | tail -50
+            SYMROOT="$(pwd)/build_output" \
+            2>&1 | tail -80
 
       - name: Package into IPA
         run: |
           APP=$(find ios/build_output -name "*.app" -type d | head -1)
-          echo "Found: $APP"
-          [ -z "$APP" ] && echo "No .app found!" && find ios -name "*.app" -type d && exit 1
+          if [ -z "$APP" ]; then
+            echo "❌ No .app found!"
+            find ios -name "*.app" -type d
+            exit 1
+          fi
+          echo "✅ Found: $APP"
 
-          EXEC=$(defaults read "$APP/Info.plist" CFBundleExecutable 2>/dev/null)
-          echo "Executable: $EXEC"
-          [ -f "$APP/$EXEC" ] && echo "✅ Binary exists!" || echo "⚠️ Binary missing!"
-
-          # Strip CI signature so Sideloadly can re-sign cleanly
-          find "$APP" \( -name "*.dylib" -o -name "*.framework" \) | \
-            xargs -I{} codesign --remove-signature {} 2>/dev/null || true
+          # Remove ad-hoc signature so Sideloadly can re-sign with your Apple ID
+          find "$APP" -name "*.dylib" -o -name "*.framework" | xargs -I{} codesign --remove-signature {} 2>/dev/null || true
           codesign --remove-signature "$APP" 2>/dev/null || true
 
           mkdir -p Payload
           cp -r "$APP" Payload/
-          zip -r AstroForge.ipa Payload
-          echo "✅ IPA: $(du -h AstroForge.ipa | cut -f1)"
+          zip -qr AstroForge.ipa Payload/
+          echo "✅ IPA built: $(du -h AstroForge.ipa | cut -f1)"
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
