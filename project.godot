@@ -17,9 +17,9 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 config/name="AstroForge"
 run/main_scene="res://scenes/Launcher.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
-config/icon="res://icon.svg"
-boot_splash/show_image=false
 boot_splash/bg_color=Color(0.04, 0.03, 0.08, 1)
+boot_splash/show_image=false
+config/icon="res://icon.svg"
 
 [autoload]
 
@@ -39,13 +39,13 @@ window/size/window_height_override=960
 window/stretch/mode="canvas_items"
 window/handheld/orientation=1
 
-[gui]
-
-common/default_scroll_deadzone=12
-
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")
+
+[gui]
+
+common/default_scroll_deadzone=12
 
 [rendering]
 

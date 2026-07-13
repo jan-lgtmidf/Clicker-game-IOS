@@ -1,6 +1,7 @@
 extends Control
 
 # Background Starfield and Nebula Shader simulation
+var bg_tex: Texture2D
 var stars: Array = []
 var nebula_particles: Array = []
 var num_stars = 40
@@ -27,6 +28,21 @@ var ripples: Array = []
 func _ready() -> void:
 	custom_minimum_size = Vector2(540, 960)
 	center = Vector2(270, 480)
+	
+	# Load custom background with dynamic fallback for editor/exported build compatibility
+	var bg_path = "res://assets/custom_background.png"
+	if FileAccess.file_exists(bg_path):
+		var img = Image.load_from_file(bg_path)
+		if img:
+			bg_tex = ImageTexture.create_from_image(img)
+			
+	if not bg_tex and ResourceLoader.exists(bg_path):
+		bg_tex = load(bg_path)
+		
+	if not bg_tex:
+		var fallback_path = "res://assets/Kenney/kenney_space-shooter-remastered/Backgrounds/darkPurple.png"
+		if ResourceLoader.exists(fallback_path):
+			bg_tex = load(fallback_path)
 	
 	var rng = RandomNumberGenerator.new()
 	rng.seed = 77
@@ -157,8 +173,6 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	# Draw background vacuum with custom generated high-quality texture
-	var bg_tex = load("res://assets/custom_background.png")
 	if bg_tex:
 		draw_texture_rect(bg_tex, Rect2(Vector2.ZERO, size), false, Color(0.85, 0.85, 0.95, 1.0))
 	else:
