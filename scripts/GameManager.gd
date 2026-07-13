@@ -46,7 +46,8 @@ var lifetime_stardust: float = 0.0
 var current_sector: int = 1
 
 func get_sector_target() -> float:
-	return 1000.0 * pow(5.0, float(current_sector - 1))
+	var safe_sector = max(1, current_sector)
+	return 1000.0 * pow(5.0, float(safe_sector - 1))
 
 # Stats tracking for achievements
 var stats: Dictionary = {
@@ -626,6 +627,9 @@ func trigger_prestige() -> bool:
 	overdrive_active = false
 	magnetic_net_active = false
 	
+	# Reset sector back to 1 on prestige
+	current_sector = 1
+	
 	game_reset.emit()
 	stats_changed.emit()
 	SoundManager.play_sound(SoundManager.prestige_stream, 0.0, 0.0)
@@ -674,6 +678,13 @@ func hard_reset() -> void:
 	overdrive_timer = 0.0
 	magnetic_net_active = false
 	magnetic_net_timer = 0.0
+	
+	# Reset sector
+	current_sector = 1
+	
+	# Reset artifacts
+	unlocked_artifacts.clear()
+	equipped_artifacts.clear()
 	
 	game_reset.emit()
 	stats_changed.emit()
