@@ -22,6 +22,8 @@ Clicker game/
 ├── export_presets.cfg                  ← iOS Export-Konfiguration (application/signature="-")
 ├── .github/workflows/ios_build.yml    ← GitHub Actions Workflow für .ipa Build
 ├── scenes/
+│   ├── Launcher.tscn                   ← OTA-Launcher UI (Ladebalken, Download-Anzeige)
+│   ├── Launcher.gd                     ← Download-Verbindung & Autoload-Hot-Reload
 │   ├── Main.tscn                       ← Hauptszene mit HUD, Tabs und Telemetrie
 │   ├── Main.gd                         ← HUD, Tabs-Handling, Kometen & Drohnen-Prozess
 │   ├── SpaceBackground.tscn
@@ -209,6 +211,24 @@ application/signature="-"                   # WICHTIG: "-" für Ad-Hoc, NICHT le
 5. Auf dem iPhone: Einstellungen → Allgemein → VPN & Geräteverwaltung → App vertrauen
 
 > **Hinweis:** Mit einer kostenlosen Apple ID über Sideloadly muss die App alle 7 Tage neu signiert werden. Mit einem Apple Developer Account (99$/Jahr) kann eine unbegrenzte Ad-Hoc Distribution erstellt werden.
+
+---
+
+## 🌐 Over-The-Air (OTA) Update-System
+
+AstroForge nutzt ein dynamisches OTA-Update-System, um Code- und Asset-Updates ohne Neuinstallation der App via Sideloadly bereitzustellen.
+
+### 1. Ablauf
+1. **GitHub Action:** Bei jedem Push in `main` wird eine `AstroForge.pck` (Ressourcenpaket) und eine `version.json` exportiert und auf den Branch `ota-assets` hochgeladen.
+2. **Launcher Scene (`Launcher.tscn`):** Die App startet mit der Launcher-Szene.
+3. **Version Check:** Sie vergleicht die lokale `user://ota_version.json` mit der `version.json` auf GitHub.
+4. **PCK Download:** Ist die Remote-Version neuer, wird die neue `AstroForge.pck` nach `user://game.pck` heruntergeladen.
+5. **PCK Mounting:** Das Paket wird via `ProjectSettings.load_resource_pack("user://game.pck")` gemountet.
+6. **Autoload Hot-Reload:** Da Autoloads bereits beim Start geladen werden, führt `Launcher.gd` einen Script-Tausch durch:
+   * Kinder des Autoload-Nodes werden gelöscht (`child.free()`).
+   * Das Script wird entkoppelt (`set_script(null)`).
+   * Das neue Script wird via `ResourceLoader.load(..., "", ResourceLoader.CACHE_MODE_REPLACE)` geladen.
+   * Das neue Script wird an den Autoload-Node angehängt und über `NOTIFICATION_READY` initialisiert.
 
 ---
 

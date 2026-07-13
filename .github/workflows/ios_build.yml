@@ -7,6 +7,8 @@ on:
 jobs:
   build-ios:
     runs-on: macos-14
+    permissions:
+      contents: write
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
@@ -103,3 +105,28 @@ jobs:
           name: AstroForge-Unsigned-IPA
           path: AstroForge.ipa
           if-no-files-found: error
+
+      - name: Deploy OTA Assets to ota-assets branch
+        run: |
+          mkdir -p ota_dist
+          /Applications/Godot.app/Contents/MacOS/Godot --headless --path "." --export-pack "iOS" ota_dist/AstroForge.pck
+          
+          # Create version.json
+          cat <<EOF > ota_dist/version.json
+          {
+            "version": ${{ github.run_number }},
+            "pck_url": "https://raw.githubusercontent.com/jan-lgtmidf/Clicker-game-IOS/ota-assets/AstroForge.pck"
+          }
+          EOF
+          
+          # Initialize git repo in ota_dist and push to branch
+          cd ota_dist
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b ota-assets
+          git add AstroForge.pck version.json
+          git commit -m "Deploy OTA assets build ${{ github.run_number }}"
+          git push -f https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} ota-assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
