@@ -158,6 +158,7 @@ var overdrive_active: bool = false
 var overdrive_timer: float = 0.0
 var magnetic_net_active: bool = false
 var magnetic_net_timer: float = 0.0
+var meltdown_active: bool = false
 
 # Upgrade Configurations (Base Cost, Multiplier, Rates)
 const UPGRADE_CONFIG = {
@@ -361,6 +362,9 @@ func get_crit_multiplier() -> float:
 
 # Passive Production Rate Calculations
 func get_production_rate(id: String) -> float:
+	if meltdown_active:
+		return 0.0
+		
 	var lvl = float(upgrade_levels[id])
 	if lvl == 0:
 		return 0.0

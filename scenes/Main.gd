@@ -280,14 +280,8 @@ func _trigger_meltdown() -> void:
 	meltdown_active = true
 	meltdown_timer = 6.0
 	
-	# Disable all automation by temporarily setting levels to 0
-	cached_automation["drill"] = GameManager.upgrade_levels["drill"]
-	cached_automation["siphon"] = GameManager.upgrade_levels["siphon"]
-	cached_automation["synthesizer"] = GameManager.upgrade_levels["synthesizer"]
-	
-	GameManager.upgrade_levels["drill"] = 0
-	GameManager.upgrade_levels["siphon"] = 0
-	GameManager.upgrade_levels["synthesizer"] = 0
+	# Set meltdown active in GameManager (which temporarily bypasses passive rates)
+	GameManager.meltdown_active = true
 	GameManager.stats_changed.emit()
 	
 	# Shake and flash
@@ -306,10 +300,8 @@ func _process_meltdown(delta: float) -> void:
 			
 		if meltdown_timer <= 0.0:
 			meltdown_active = false
-			# Restore levels
-			GameManager.upgrade_levels["drill"] = cached_automation.get("drill", 0)
-			GameManager.upgrade_levels["siphon"] = cached_automation.get("siphon", 0)
-			GameManager.upgrade_levels["synthesizer"] = cached_automation.get("synthesizer", 0)
+			# Restore levels by disabling meltdown state
+			GameManager.meltdown_active = false
 			GameManager.stats_changed.emit()
 			
 			JuiceManager.trigger_flash(Color(0.0, 0.94, 1.0, 0.3), 0.5)
