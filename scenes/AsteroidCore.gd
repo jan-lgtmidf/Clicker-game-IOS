@@ -4,6 +4,14 @@ signal core_clicked(position: Vector2, is_crit: bool, ore_amount: float)
 
 @export var floating_text_scene: PackedScene = preload("res://scenes/FloatingText.tscn")
 
+var core_tex_stage1 = preload("res://assets/Kenney/kenney_space-shooter-remastered/PNG/Meteors/meteorBrown_big2.png")
+var core_tex_stage2 = preload("res://assets/Kenney/kenney_planets/Planets/planet01.png")
+var core_tex_stage3 = preload("res://assets/Kenney/kenney_planets/Planets/planet00.png")
+var core_tex_stage4 = preload("res://assets/Kenney/kenney_planets/Planets/planet08.png")
+
+var normal_particle_tex = preload("res://assets/Kenney/kenney_space-shooter-remastered/PNG/Meteors/meteorGrey_tiny1.png")
+var crit_particle_tex = preload("res://assets/Kenney/kenney_space-shooter-remastered/PNG/Effects/star1.png")
+
 # Visual customization
 var base_radius: float = 90.0
 var asteroid_points: PackedVector2Array = []
@@ -232,19 +240,39 @@ func _draw() -> void:
 			
 		draw_colored_polygon(PackedVector2Array(glow_pts), current_glow)
 		
-	# Draw Core
+	# Draw Core using preloaded Kenney textures
+	var active_tex = core_tex_stage1
+	var tex_scale = 1.0
+	match stage:
+		1:
+			active_tex = core_tex_stage1
+			tex_scale = 1.05
+		2:
+			active_tex = core_tex_stage2
+			tex_scale = 1.1
+		3:
+			active_tex = core_tex_stage3
+			tex_scale = 1.15
+		4:
+			active_tex = core_tex_stage4
+			tex_scale = 1.2
+			
+	if active_tex:
+		draw_set_transform(center, asteroid_rot, Vector2.ONE)
+		var size_to_draw = Vector2(base_radius * 2 * tex_scale, base_radius * 2 * tex_scale)
+		draw_texture_rect(active_tex, Rect2(-size_to_draw/2, size_to_draw), false)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		
+	# Draw stage overlays
 	if stage == 4:
-		# Draw Singularity Event Horizon (Black circle)
-		draw_circle(center, base_radius * 0.85, Color(0.02, 0.01, 0.05, 1.0))
-		draw_arc(center, base_radius * 0.85, 0.0, TAU, 32, border_color, 3.0, true)
+		# Draw Singularity Event Horizon (Black hole center)
+		draw_circle(center, base_radius * 0.45, Color(0.01, 0.0, 0.03, 1.0))
+		draw_arc(center, base_radius * 0.45, 0.0, TAU, 32, border_color, 2.5, true)
 	elif stage == 3:
-		# Draw Pulsar star sphere
-		draw_circle(center, base_radius * 0.90, fill_color)
-		draw_circle(center, base_radius * 0.90, Color(0.0, 0.94, 1.0, 0.2)) # inner glow
+		# Draw Pulsar star sphere inner glow border
 		draw_arc(center, base_radius * 0.90, 0.0, TAU, 32, border_color, 2.5, true)
 	else:
-		# Draw standard Rocky Core fill
-		draw_colored_polygon(PackedVector2Array(rotated_pts), fill_color)
+		# Draw standard Rocky Core neon outline for Stage 1 & 2
 		var poly_pts = PackedVector2Array(rotated_pts)
 		poly_pts.append(poly_pts[0])
 		draw_polyline(poly_pts, border_color, 4.0 if is_hovered else 2.5, true)
@@ -289,6 +317,7 @@ func trigger_click(click_pos: Vector2) -> void:
 		
 	# Add resource
 	GameManager.add_resource("space_ore", mined_ore)
+	GameManager.add_stat("manual_clicks", 1.0)
 	
 	# Skill upgrades bonus
 	var mined_gas = 0.0
@@ -324,6 +353,16 @@ func trigger_click(click_pos: Vector2) -> void:
 	particle_emitter.amount = 40 + click_combo * 4
 	particle_emitter.color = color_to_use
 	particle_emitter.position = click_pos
+	
+	if is_crit:
+		particle_emitter.texture = crit_particle_tex
+		particle_emitter.scale_amount_min = 0.08
+		particle_emitter.scale_amount_max = 0.22
+	else:
+		particle_emitter.texture = normal_particle_tex
+		particle_emitter.scale_amount_min = 0.4
+		particle_emitter.scale_amount_max = 1.0
+		
 	particle_emitter.restart()
 	
 	# Spawning color-coded floating text popups

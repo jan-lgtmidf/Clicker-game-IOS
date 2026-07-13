@@ -1,21 +1,21 @@
 extends Node
 
 # Dynamically synthesized sound streams
-var click_stream: AudioStreamWAV
-var crit_stream: AudioStreamWAV
-var upgrade_stream: AudioStreamWAV
-var prestige_stream: AudioStreamWAV
+var click_stream: AudioStream
+var crit_stream: AudioStream
+var upgrade_stream: AudioStream
+var prestige_stream: AudioStream
 
 # Warning & spell sounds
-var alarm_stream: AudioStreamWAV
-var perfect_stream: AudioStreamWAV
-var meltdown_stream: AudioStreamWAV
-var spell_stream: AudioStreamWAV
+var alarm_stream: AudioStream
+var perfect_stream: AudioStream
+var meltdown_stream: AudioStream
+var spell_stream: AudioStream
 
 # Looping ambient music synth streams
-var music_normal_stream: AudioStreamWAV
-var music_overdrive_stream: AudioStreamWAV
-var music_meltdown_stream: AudioStreamWAV
+var music_normal_stream: AudioStream
+var music_overdrive_stream: AudioStream
+var music_meltdown_stream: AudioStream
 
 # Mix rate for synthesis
 const MIX_RATE = 22050
@@ -27,16 +27,16 @@ var active_player: AudioStreamPlayer
 var current_music_state: String = ""
 
 func _ready() -> void:
-	# Generate sound streams in memory on startup
-	click_stream = _generate_click_sound(false)
-	crit_stream = _generate_click_sound(true)
-	upgrade_stream = _generate_upgrade_sound()
-	prestige_stream = _generate_prestige_sound()
+	# Load sound streams from assets (with procedural fallback)
+	click_stream = _load_sound_or_fallback("res://assets/SCI-FI_UI_SFX_PACK/Clicks/Click_Mid.wav", func(): return _generate_click_sound(false))
+	crit_stream = _load_sound_or_fallback("res://assets/SCI-FI_UI_SFX_PACK/Clicks/Click_Pitched_Up.wav", func(): return _generate_click_sound(true))
+	upgrade_stream = _load_sound_or_fallback("res://assets/SCI-FI_UI_SFX_PACK/Tone1/Major/Tone1A_MajorTriadUp.wav", func(): return _generate_upgrade_sound())
+	prestige_stream = _load_sound_or_fallback("res://assets/SCI-FI_UI_SFX_PACK/Impacts/Impact_1.wav", func(): return _generate_prestige_sound())
 	
-	alarm_stream = _generate_alarm_sound()
-	perfect_stream = _generate_perfect_sound()
-	meltdown_stream = _generate_meltdown_sound()
-	spell_stream = _generate_spell_sound()
+	alarm_stream = _load_sound_or_fallback("res://assets/SCI-FI_UI_SFX_PACK/Glitches/Glitch.wav", func(): return _generate_alarm_sound())
+	perfect_stream = _load_sound_or_fallback("res://assets/SCI-FI_UI_SFX_PACK/Rings/Ring_Pitched_Up.wav", func(): return _generate_perfect_sound())
+	meltdown_stream = _load_sound_or_fallback("res://assets/SCI-FI_UI_SFX_PACK/Glitches/Glitch_2.wav", func(): return _generate_meltdown_sound())
+	spell_stream = _load_sound_or_fallback("res://assets/SCI-FI_UI_SFX_PACK/Rings/Reverse_Ring_High.wav", func(): return _generate_spell_sound())
 	
 	# Synthesize 4-second mathematically perfect looping chord pads
 	music_normal_stream = _generate_chord_loop([220.0, 261.75, 329.75, 440.0]) # A3 minor chord (A, C, E, A)
@@ -64,7 +64,7 @@ func transition_music_to(state: String) -> void:
 		return
 	current_music_state = state
 	
-	var target_stream: AudioStreamWAV
+	var target_stream: AudioStream
 	match state:
 		"normal":
 			target_stream = music_normal_stream
@@ -88,7 +88,7 @@ func transition_music_to(state: String) -> void:
 	active_player = inactive_player
 
 # Play a stream using a temporary AudioStreamPlayer with custom pitch (combo support)
-func play_sound(stream: AudioStreamWAV, pitch_randomness: float = 0.0, volume_db: float = 0.0, custom_pitch: float = 1.0) -> void:
+func play_sound(stream: AudioStream, pitch_randomness: float = 0.0, volume_db: float = 0.0, custom_pitch: float = 1.0) -> void:
 	if not stream:
 		return
 	var player = AudioStreamPlayer.new()
@@ -103,6 +103,14 @@ func play_sound(stream: AudioStreamWAV, pitch_randomness: float = 0.0, volume_db
 	player.pitch_scale = clamp(pitch, 0.1, 4.0)
 	player.finished.connect(player.queue_free)
 	player.play()
+
+# Load sound from disk or fall back to procedural generation
+func _load_sound_or_fallback(path: String, fallback_callable: Callable) -> AudioStream:
+	if ResourceLoader.exists(path):
+		var res = load(path)
+		if res is AudioStream:
+			return res
+	return fallback_callable.call()
 
 # ----------------- SOUND SYNTHESIS -----------------
 

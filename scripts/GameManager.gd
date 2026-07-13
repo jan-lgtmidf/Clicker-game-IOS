@@ -5,6 +5,7 @@ signal resource_changed(type: String, current_amount: float)
 signal stats_changed()
 signal skill_unlocked(skill_id: String)
 signal game_reset()
+signal achievement_unlocked(id: String)
 
 # Resource Variables
 var space_ore: float = 0.0:
@@ -41,6 +42,70 @@ var stardust_invested: float = 0.0:
 # Lifetime statistics
 var lifetime_space_ore: float = 0.0
 var lifetime_stardust: float = 0.0
+
+# Stats tracking for achievements
+var stats: Dictionary = {
+	"manual_clicks": 0.0,
+	"lifetime_gas": 0.0,
+	"lifetime_crystals": 0.0,
+	"lifetime_comets": 0.0,
+	"stabilizations": 0.0,
+	"prestige_count": 0.0
+}
+
+var unlocked_achievements: Array = []
+
+const ACHIEVEMENTS_CONFIG: Dictionary = {
+	"first_click": {
+		"title": "Erster Kontakt",
+		"desc": "Baue dein erstes Weltraumerz manuell ab.",
+		"progress_needed": 1.0,
+		"stat_tracked": "manual_clicks",
+		"buff": "+1% Klickleistung"
+	},
+	"ore_1k": {
+		"title": "Erz-Schürfer",
+		"desc": "Besitze insgesamt 1.000 Weltraumerz.",
+		"progress_needed": 1000.0,
+		"stat_tracked": "lifetime_space_ore",
+		"buff": "+1% Erz-Bohrer-Produktion"
+	},
+	"gas_100": {
+		"title": "Gas-Pionier",
+		"desc": "Besitze insgesamt 100 Kosmisches Gas.",
+		"progress_needed": 100.0,
+		"stat_tracked": "lifetime_gas",
+		"buff": "+1% Gas-Siphon-Produktion"
+	},
+	"crystals_10": {
+		"title": "Kristallsammler",
+		"desc": "Sammle insgesamt 10 Sternenkristalle.",
+		"progress_needed": 10.0,
+		"stat_tracked": "lifetime_crystals",
+		"buff": "+1% Krit-Chance"
+	},
+	"comets_10": {
+		"title": "Astronom",
+		"desc": "Klicke 10 fliegende Kometen an.",
+		"progress_needed": 10.0,
+		"stat_tracked": "lifetime_comets",
+		"buff": "+5% Globaler Ertrag"
+	},
+	"supernova_10": {
+		"title": "Kern-Stabilisator",
+		"desc": "Verhindere 10 Supernova-Kernschmelzen.",
+		"progress_needed": 10.0,
+		"stat_tracked": "stabilizations",
+		"buff": "+5% Reaktor-Fenster"
+	},
+	"prestige_first": {
+		"title": "Kollaps-Überlebender",
+		"desc": "Löse deinen ersten Kosmischen Kollaps (Prestige) aus.",
+		"progress_needed": 1.0,
+		"stat_tracked": "prestige_count",
+		"buff": "+5% Sternenstaub-Ertrag"
+	}
+}
 
 # Upgrades levels
 var upgrade_levels: Dictionary = {
@@ -269,12 +334,16 @@ func get_click_power() -> float:
 	var mult = 1.0
 	if unlocked_skills.has("ore_magnet"):
 		mult += 0.25
+	if is_achievement_unlocked("first_click"):
+		mult += 0.01
 	
 	mult += get_global_production_multiplier()
 	return base * mult
 
 func get_crit_chance() -> float:
 	var base = float(upgrade_levels["crit_chance"]) * 0.01 + 0.05
+	if is_achievement_unlocked("crystals_10"):
+		base += 0.01
 	return min(0.50, base)
 
 func get_crit_multiplier() -> float:
@@ -301,10 +370,14 @@ func get_production_rate(id: String) -> float:
 			base_rate = lvl * 1.5
 			if unlocked_skills.has("quantum_drill"):
 				mult += 0.30
+			if is_achievement_unlocked("ore_1k"):
+				mult += 0.01
 		"siphon":
 			base_rate = lvl * 0.4
 			if unlocked_skills.has("gas_igniter"):
 				mult += 0.20
+			if is_achievement_unlocked("gas_100"):
+				mult += 0.01
 		"synthesizer":
 			base_rate = lvl * 0.1
 			
@@ -313,6 +386,8 @@ func get_production_rate(id: String) -> float:
 func get_global_production_multiplier() -> float:
 	var mult = stardust * 0.02
 	mult += perk_levels["global_boost"] * 0.05
+	if is_achievement_unlocked("comets_10"):
+		mult += 0.05
 	return mult
 
 # Process idle income
@@ -454,6 +529,8 @@ func get_pending_stardust() -> float:
 	var mult = 1.0
 	if unlocked_skills.has("cosmic_forge"):
 		mult += 1.0
+	if is_achievement_unlocked("prestige_first"):
+		mult += 0.05
 		
 	var earned = floor(100.0 * sqrt(lifetime_space_ore / 100000.0))
 	var pending = earned - lifetime_stardust
@@ -492,6 +569,55 @@ func trigger_prestige() -> bool:
 	save_game()
 	return true
 
+func hard_reset() -> void:
+	# Delete save file if exists
+	if FileAccess.file_exists(SAVE_PATH):
+		DirAccess.remove_absolute(SAVE_PATH)
+		
+	# Reset resources
+	space_ore = 0.0
+	cosmic_gas = 0.0
+	star_crystals = 0.0
+	stardust = 0.0
+	dark_matter = 0.0
+	stardust_invested = 0.0
+	lifetime_space_ore = 0.0
+	lifetime_stardust = 0.0
+	
+	# Reset upgrades
+	for up_id in upgrade_levels.keys():
+		if up_id == "click_power":
+			upgrade_levels[up_id] = 1
+		else:
+			upgrade_levels[up_id] = 0
+			
+	# Reset singularity upgrades
+	for sing_id in singularity_upgrades.keys():
+		singularity_upgrades[sing_id] = 0
+		
+	# Reset perks
+	for perk_id in perk_levels.keys():
+		perk_levels[perk_id] = 0
+		
+	# Reset skills
+	unlocked_skills.clear()
+	
+	# Reset achievements & stats
+	unlocked_achievements.clear()
+	for k in stats.keys():
+		stats[k] = 0.0
+	
+	overdrive_active = false
+	overdrive_timer = 0.0
+	magnetic_net_active = false
+	magnetic_net_timer = 0.0
+	
+	game_reset.emit()
+	stats_changed.emit()
+	
+	SoundManager.play_sound(SoundManager.prestige_stream, 0.0, 0.0)
+	save_game()
+
 func get_perk_cost(id: String) -> float:
 	var lvl = perk_levels[id]
 	match id:
@@ -514,6 +640,40 @@ func buy_perk(id: String) -> bool:
 		return true
 	return false
 
+# ----------------- ACHIEVEMENTS STATS & LOGIC -----------------
+
+func add_stat(id: String, amount: float) -> void:
+	if not stats.has(id):
+		stats[id] = 0.0
+	stats[id] += amount
+	_check_achievements()
+
+func is_achievement_unlocked(id: String) -> bool:
+	return unlocked_achievements.has(id)
+
+func _check_achievements() -> void:
+	var unlocked_any = false
+	for id in ACHIEVEMENTS_CONFIG.keys():
+		if unlocked_achievements.has(id):
+			continue
+			
+		var config = ACHIEVEMENTS_CONFIG[id]
+		var stat_name = config["stat_tracked"]
+		var current_val = 0.0
+		if stat_name == "lifetime_space_ore":
+			current_val = lifetime_space_ore
+		elif stats.has(stat_name):
+			current_val = stats[stat_name]
+			
+		if current_val >= config["progress_needed"]:
+			unlocked_achievements.append(id)
+			achievement_unlocked.emit(id)
+			unlocked_any = true
+			
+	if unlocked_any:
+		stats_changed.emit()
+		save_game()
+
 # ----------------- STATE FUNCTIONS -----------------
 
 func add_resource(type: String, amount: float) -> void:
@@ -524,10 +684,13 @@ func add_resource(type: String, amount: float) -> void:
 		"space_ore":
 			space_ore += amount
 			lifetime_space_ore += amount
+			_check_achievements() # Also check achievements since lifetime_space_ore changed
 		"cosmic_gas":
 			cosmic_gas += amount
+			add_stat("lifetime_gas", amount)
 		"star_crystals":
 			star_crystals += amount
+			add_stat("lifetime_crystals", amount)
 		"stardust":
 			stardust += amount
 		"dark_matter":
@@ -604,6 +767,10 @@ func save_game() -> void:
 	# Skills
 	config.set_value("skills", "unlocked", unlocked_skills)
 	
+	# Achievements & Stats
+	config.set_value("achievements", "unlocked", unlocked_achievements)
+	config.set_value("achievements", "stats", stats)
+	
 	# Save time
 	last_save_time = Time.get_unix_time_from_system()
 	config.set_value("meta", "last_save_time", last_save_time)
@@ -679,6 +846,20 @@ func load_game() -> void:
 		unlocked_skills = loaded_skills
 	else:
 		unlocked_skills = []
+		
+	# Achievements (safely load array)
+	var loaded_achievements = config.get_value("achievements", "unlocked", [])
+	if typeof(loaded_achievements) == TYPE_ARRAY:
+		unlocked_achievements = loaded_achievements
+	else:
+		unlocked_achievements = []
+		
+	# Stats (safely load dictionary)
+	var loaded_stats = config.get_value("achievements", "stats", {})
+	if typeof(loaded_stats) == TYPE_DICTIONARY:
+		for k in stats.keys():
+			if loaded_stats.has(k):
+				stats[k] = float(loaded_stats[k])
 	
 	# Calculate Offline earnings
 	last_save_time = float(config.get_value("meta", "last_save_time", 0.0))

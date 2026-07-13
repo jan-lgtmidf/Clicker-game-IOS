@@ -42,24 +42,6 @@ jobs:
           fi
           echo "✅ Export OK"
 
-      - name: Create Self-Signed Certificate
-        run: |
-          security create-keychain -p "ci" ci.keychain
-          security default-keychain -s ci.keychain
-          security unlock-keychain -p "ci" ci.keychain
-          security set-keychain-settings -t 7200 ci.keychain
-          openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
-            -keyout /tmp/k.key -out /tmp/c.crt \
-            -subj "/CN=iPhone Developer/O=CI/C=US"
-          openssl pkcs12 -export -inkey /tmp/k.key -in /tmp/c.crt \
-            -out /tmp/s.p12 -passout pass:ci
-          security import /tmp/s.p12 -k ci.keychain -P ci \
-            -T /usr/bin/codesign -T /usr/bin/xcodebuild
-          security set-key-partition-list -S apple-tool:,apple:,codesign: \
-            -s -k "ci" ci.keychain
-          CERT=$(security find-identity -v ci.keychain | grep "iPhone Developer" | awk '{print $2}' | head -1)
-          echo "CERT_ID=$CERT" >> $GITHUB_ENV
-
       - name: Build Xcode Project
         run: |
           cd ios
@@ -73,16 +55,18 @@ jobs:
             -scheme "$SCHEME" \
             -sdk iphoneos \
             -configuration Release \
-            CODE_SIGN_IDENTITY="$CERT_ID" \
+            CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=YES \
             CODE_SIGNING_ALLOWED=YES \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
             PRODUCT_BUNDLE_IDENTIFIER=com.jan.astroforge \
             ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
             SWIFT_VERSION=5.0 \
-            ENABLE_BITCODE=NO \
             clean build \
             SYMROOT=$(pwd)/build_output \
-            2>&1 | tail -30
+            2>&1 | tail -50
 
       - name: Package into IPA
         run: |

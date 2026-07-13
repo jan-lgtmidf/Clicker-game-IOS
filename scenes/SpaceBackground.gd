@@ -157,30 +157,34 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	# Draw background vacuum
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.02, 0.09, 1.0))
+	# Draw background vacuum with tiled Kenney texture
+	var bg_tex = load("res://assets/Kenney/kenney_space-shooter-remastered/Backgrounds/darkPurple.png")
+	if bg_tex:
+		draw_texture_rect(bg_tex, Rect2(Vector2.ZERO, size), true, Color(0.85, 0.85, 0.95, 1.0))
+	else:
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.02, 0.09, 1.0))
 	
-	# Pulse background glow
+	# Pulse background glow (subtle)
 	if pulse_intensity > 0.0:
 		var glow = pulse_color
-		glow.a = pulse_intensity * 0.18
+		glow.a = pulse_intensity * 0.03
 		draw_circle(center, 360.0, glow)
 		
 		var glow_inner = pulse_color
-		glow_inner.a = pulse_intensity * 0.35
-		draw_circle(center, 160.0, glow_inner)
+		glow_inner.a = pulse_intensity * 0.08
+		draw_circle(center, 120.0, glow_inner)
 	
 	# 1. Draw Nebulae
 	for neb in nebula_particles:
 		var n_center = center + neb["pos"]
 		var rad = neb["radius"] + sin(neb["phase"]) * 15.0
 		if pulse_intensity > 0.0:
-			rad += pulse_intensity * 40.0
+			rad += pulse_intensity * 10.0
 			
 		var col = neb["color"]
 		if pulse_intensity > 0.0:
-			col = col.lerp(pulse_color, pulse_intensity * 0.4)
-			col.a += pulse_intensity * 0.04
+			col = col.lerp(pulse_color, pulse_intensity * 0.15)
+			col.a += pulse_intensity * 0.01
 		
 		var steps = 6
 		for step in range(steps):
@@ -224,17 +228,17 @@ func _draw() -> void:
 			
 		draw_circle(p, dust["size"], c)
 		
-	# 4. Draw Expanding Click Ripple Rings
+	# 4. Draw Expanding Click Ripple Rings (Subtle vector shockwaves)
 	for ripple in ripples:
 		var draw_col = ripple["color"]
-		draw_col.a = ripple["opacity"]
+		draw_col.a = ripple["opacity"] * 0.25
 		
 		# Draw expanding vector ring outline
 		var radius = 40.0 * ripple["scale"]
-		draw_arc(ripple["pos"], radius, 0.0, TAU, 32, draw_col, 3.0, true)
+		draw_arc(ripple["pos"], radius, 0.0, TAU, 32, draw_col, 1.5, true)
 		# Secondary outer ring
-		draw_col.a = ripple["opacity"] * 0.4
-		draw_arc(ripple["pos"], radius + 8.0, 0.0, TAU, 32, draw_col, 1.5, true)
+		draw_col.a = ripple["opacity"] * 0.08
+		draw_arc(ripple["pos"], radius + 8.0, 0.0, TAU, 32, draw_col, 1.0, true)
 
 	# 5. Draw UI Electricity Reactor Borders
 	var left_border_col = Color(0.0, 0.94, 1.0, 0.20)
