@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "godot-mcp-pro": {
+      "command": "node",
+      "args": [
+        "c:/Users/Jaan/Desktop/Clicker game/MCP Godot Pro/server/build/index.js"
+      ]
+    }
+  }
+}

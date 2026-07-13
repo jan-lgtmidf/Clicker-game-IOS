@@ -109,9 +109,13 @@ func _process(delta: float) -> void:
 	asteroid_rot += rot_speed * delta
 	ring_rot -= (rot_speed * 1.4) * delta
 	
-	# Breathing/Pulsing effect when idle
-	pulse_time += delta * 2.2
-	var pulse = 1.0 + sin(pulse_time) * (0.012 if not is_hovered else 0.032)
+	# Breathing/Pulsing effect when idle (intensified by combo)
+	var combo_speed_mult = 1.0 + float(click_combo) * 0.2
+	pulse_time += delta * 2.2 * combo_speed_mult
+	var pulse_amp = 0.012 if not is_hovered else 0.032
+	if click_combo >= 5:
+		pulse_amp += float(click_combo) * 0.005
+	var pulse = 1.0 + sin(pulse_time) * pulse_amp
 	
 	# Spring physics for Squash & Stretch
 	var displacement = current_scale - Vector2(pulse, pulse)
@@ -293,6 +297,44 @@ func _draw() -> void:
 		for pt in cage_pts:
 			draw_line(center, pt, Color(0.0, 0.94, 1.0, 0.25), 1.0)
 			draw_circle(pt, 5.0, Color(0.0, 0.94, 1.0, 0.9))
+			
+	# Draw Combo Fever Visual Effects (Lightning, Energy Rings, Extra Glows)
+	if click_combo >= 5:
+		var base_color = Color(0.0, 0.94, 1.0) if click_combo < 10 else Color(1.0, 0.0, 0.5)
+		# Subtle inner glow only — no big bloom
+		for j in range(2):
+			var layer_radius = base_radius * (1.05 + float(j) * 0.1 + sin(pulse_time * 2.0) * 0.03)
+			var layer_color = base_color
+			layer_color.a = 0.05 / (j + 1.0)
+			draw_circle(center, layer_radius, layer_color)
+			
+		# Faint pulsing ring — barely visible
+		var ring_scale = fmod(pulse_time * 0.5, 1.0)
+		var ring_color = base_color
+		ring_color.a = (1.0 - ring_scale) * 0.12
+		draw_arc(center, base_radius * (1.0 + ring_scale * 0.6), 0.0, TAU, 24, ring_color, 1.2, true)
+		
+	# Small surface arcs — only appear at x5+, subtle at x3-4
+	if click_combo >= 5:
+		var num_arcs = 1 if click_combo < 10 else 2
+		var rot_xform_local = Transform2D(asteroid_rot, Vector2.ZERO)
+		for a in range(num_arcs):
+			var idx1 = (randi() + a) % asteroid_points.size()
+			var idx2 = (idx1 + 4 + (randi() % (asteroid_points.size() - 8))) % asteroid_points.size()
+			var pt1 = center + rot_xform_local * asteroid_points[idx1]
+			var pt2 = center + rot_xform_local * asteroid_points[idx2]
+			
+			var lt_color = Color(0.0, 0.94, 1.0, 0.35) if click_combo < 10 else Color(1.0, 0.0, 0.5, 0.4)
+			_draw_lightning(pt1, pt2, lt_color, 1.5)
+			
+	if click_combo >= 10:
+		var rot_xform_local = Transform2D(asteroid_rot, Vector2.ZERO)
+		# Only 1 subtle outer arc at x10
+		var idx = randi() % asteroid_points.size()
+		var angle = (float(idx) / asteroid_points.size()) * TAU + asteroid_rot
+		var start_pt = center + rot_xform_local * asteroid_points[idx]
+		var end_pt = center + Vector2(cos(angle) * (base_radius * 1.4), sin(angle) * (base_radius * 1.4))
+		_draw_lightning(start_pt, end_pt, Color(1.0, 0.0, 0.5, 0.35), 1.8)
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -334,6 +376,9 @@ func trigger_click(click_pos: Vector2) -> void:
 
 	# Emit Click Signal
 	core_clicked.emit(click_pos, is_crit, mined_ore)
+	
+	if click_combo >= 10 and is_crit:
+		JuiceManager.shake_camera(6.0, 0.25)
 	
 	# Combo-pitched sound chimes
 	var combo_pitch = 1.0 + float(click_combo) * 0.05
@@ -384,3 +429,21 @@ func _on_mouse_entered() -> void:
 
 func _on_mouse_exited() -> void:
 	is_hovered = false
+
+func _draw_lightning(start_pos: Vector2, end_pos: Vector2, color: Color, thickness: float) -> void:
+	var pts = PackedVector2Array()
+	pts.append(start_pos)
+	
+	var segments = 4
+	var current = start_pos
+	for i in range(1, segments):
+		var t = float(i) / segments
+		var target = start_pos.lerp(end_pos, t)
+		var diff = end_pos - start_pos
+		var normal = Vector2(-diff.y, diff.x).normalized()
+		var jitter = normal * randf_range(-10.0, 10.0)
+		current = target + jitter
+		pts.append(current)
+		
+	pts.append(end_pos)
+	draw_polyline(pts, color, thickness, true)

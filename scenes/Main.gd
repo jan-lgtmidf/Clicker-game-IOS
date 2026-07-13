@@ -18,6 +18,10 @@ var tab_achievements: ScrollContainer
 var achievements_list: VBoxContainer
 var achievements_tab_btn: Button
 
+var sector_progress_bar: ProgressBar
+var travel_btn: Button
+var sector_label: Label
+
 @onready var upgrades_list: VBoxContainer = $HUD/VBoxContainer/PanelContainer/UpgradesPanel/VBox
 @onready var automation_list: VBoxContainer = $HUD/VBoxContainer/PanelContainer/AutomationPanel/VBox
 @onready var perks_list: VBoxContainer = $HUD/VBoxContainer/PanelContainer/PrestigePanel/VBox/PerksList
@@ -81,6 +85,8 @@ var alarm_sound_timer: float = 0.0
 # Meltdown active
 var meltdown_active: bool = false
 var meltdown_timer: float = 0.0
+var meltdown_minigame_active: bool = false
+var active_meltdown_bubbles: Array = []
 var cached_automation: Dictionary = {}
 
 # Spells Cooldown trackers
@@ -200,6 +206,7 @@ func _ready() -> void:
 	$HUD/OfflineModal/Center/Card/VBox/ConfirmBtn.text = "DATEN BERGEN"
 	
 	_create_achievements_ui()
+	_create_sector_ui()
 	
 	select_tab(0)
 	_update_all_labels()
@@ -281,31 +288,100 @@ func _trigger_meltdown() -> void:
 	$HUD/VBoxContainer/CoreContainer/AsteroidCore.supernova_ring_scale = 0.0
 	supernova_timer = randf_range(90.0, 120.0)
 	
-	if meltdown_active: return
-	meltdown_active = true
-	meltdown_timer = 6.0
+	if meltdown_active or meltdown_minigame_active: return
 	
-	# Set meltdown active in GameManager (which temporarily bypasses passive rates)
-	GameManager.meltdown_active = true
-	GameManager.stats_changed.emit()
+	# Start interactive cooling minigame
+	meltdown_minigame_active = true
 	
-	# Shake and flash
+	var duration = 6.0
+	if GameManager.equipped_artifacts.has("grav_anchor"):
+		duration += 3.0
+	meltdown_timer = duration
+	
+	# Spawn Plasma Bubbles
+	var viewport_width = get_viewport().get_visible_rect().size.x
+	var viewport_height = get_viewport().get_visible_rect().size.y
+	
+	# Clean up any leftover bubbles (just in case)
+	for b in active_meltdown_bubbles:
+		if is_instance_valid(b):
+			b.queue_free()
+	active_meltdown_bubbles.clear()
+	
+	for i in range(5):
+		var bubble = PlasmaBubble.new()
+		bubble.main_ref = self
+		# Spawn inside safe view boundaries
+		bubble.position = Vector2(randf_range(60.0, viewport_width - 140.0), randf_range(200.0, viewport_height - 280.0))
+		bubble.popped.connect(_on_bubble_popped)
+		$HUD.add_child(bubble)
+		active_meltdown_bubbles.append(bubble)
+		
+	# Play alarm warning
 	SoundManager.play_sound(SoundManager.meltdown_stream)
-	JuiceManager.trigger_flash(Color(1.0, 0.0, 0.0, 0.65), 1.0)
-	JuiceManager.shake_camera(28.0, 0.8)
+	JuiceManager.trigger_flash(Color(1.0, 0.0, 0.5, 0.5), 0.8)
+	JuiceManager.shake_camera(18.0, 0.6)
 	
-	JuiceManager.spawn_floating_text(self, Vector2(270, 360), "REAKTOR-KERNSCHMELZE!\nAutomatisierung offline für 6 Sek.", true, Color(1.0, 0.0, 0.0))
+	JuiceManager.spawn_floating_text(self, Vector2(270, 320), "KERNSCHMELZE WARNUNG!\nZerplatze 5 Plasma-Blasen!", true, Color(1.0, 0.0, 0.5), 2)
+
+func _on_bubble_popped(bubble) -> void:
+	if active_meltdown_bubbles.has(bubble):
+		active_meltdown_bubbles.erase(bubble)
+		
+	if active_meltdown_bubbles.size() == 0 and meltdown_minigame_active:
+		# Success: Reactor stabilized!
+		meltdown_minigame_active = false
+		
+		# Give massive resource reward based on click power
+		var power = GameManager.get_click_power()
+		var ore_reward = power * 25.0
+		var gas_reward = power * 4.0
+		GameManager.add_resource("space_ore", ore_reward)
+		GameManager.add_resource("cosmic_gas", gas_reward)
+		
+		JuiceManager.trigger_flash(Color(0.0, 0.94, 1.0, 0.55), 0.7)
+		JuiceManager.shake_camera(12.0, 0.4)
+		JuiceManager.spawn_floating_text(self, Vector2(270, 360), "REAKTOR STABILISIERT!\n+%d Ore & +%d Gas erhalten!" % [int(ore_reward), int(gas_reward)], true, Color(0.0, 0.94, 1.0), 3)
+		
+		_update_all_labels()
+		GameManager.save_game()
 
 func _process_meltdown(delta: float) -> void:
-	if meltdown_active:
+	if meltdown_minigame_active:
 		meltdown_timer -= delta
-		# Red edge warnings while offline
+		# Flash warning red tint occasionally
+		if fmod(meltdown_timer, 0.5) < delta:
+			JuiceManager.trigger_flash(Color(1.0, 0.0, 0.5, 0.06), 0.35)
+			
+		if meltdown_timer <= 0.0:
+			# Failed to stabilize! Kernschmelze erfolgt
+			meltdown_minigame_active = false
+			
+			# Clean up bubbles
+			for b in active_meltdown_bubbles:
+				if is_instance_valid(b):
+					b.queue_free()
+			active_meltdown_bubbles.clear()
+			
+			# Activate actual meltdown penalty (offline for 6 seconds)
+			meltdown_active = true
+			meltdown_timer = 6.0
+			GameManager.meltdown_active = true
+			GameManager.stats_changed.emit()
+			
+			# High intensity shake and flash
+			JuiceManager.trigger_flash(Color(1.0, 0.0, 0.0, 0.8), 1.2)
+			JuiceManager.shake_camera(32.0, 1.0)
+			
+			JuiceManager.spawn_floating_text(self, Vector2(270, 360), "REAKTOR-KERNSCHMELZE!\nAutomatisierung offline für 6 Sek.", true, Color(1.0, 0.0, 0.0), 2)
+			
+	elif meltdown_active:
+		meltdown_timer -= delta
 		if fmod(meltdown_timer, 0.8) < delta:
 			JuiceManager.trigger_flash(Color(1.0, 0.0, 0.0, 0.08), 0.5)
 			
 		if meltdown_timer <= 0.0:
 			meltdown_active = false
-			# Restore levels by disabling meltdown state
 			GameManager.meltdown_active = false
 			GameManager.stats_changed.emit()
 			
@@ -326,45 +402,54 @@ func _process_comets_and_drones(delta: float) -> void:
 	var core_pos = $HUD/VBoxContainer/CoreContainer/AsteroidCore.global_position + Vector2(150, 150)
 	core_center_pos = core_pos
 	
-	# Spawn/despawn Drones
+	# Spawn/despawn Drones (Orbit style)
 	var target_count = GameManager.get_drone_count()
 	while drones.size() < target_count:
+		var idx = drones.size()
 		drones.append({
+			"angle": randf_range(0.0, TAU),
+			"orbit_rx": randf_range(160.0, 210.0),
+			"orbit_ry": randf_range(110.0, 150.0),
+			"orbit_speed": randf_range(0.3, 0.7) * (1.0 if randf() > 0.5 else -1.0),
 			"pos": core_pos,
-			"target": core_pos,
-			"state": "mining",
-			"timer": 0.0
+			"laser_timer": randf_range(0.5, 3.0),
+			"laser_active": false,
+			"laser_duration": 0.0
 		})
 	while drones.size() > target_count:
 		drones.pop_back()
 		
-	# Move Drones
-	var speed = GameManager.get_drone_speed()
+	# Move Drones in elliptical orbits
 	for drone in drones:
-		if drone["state"] == "mining":
-			drone["pos"] = drone["pos"].move_toward(drone["target"], speed * delta)
-			if drone["pos"].distance_to(drone["target"]) < 5.0:
-				drone["state"] = "idle"
-				drone["timer"] = 0.8
-		elif drone["state"] == "idle":
-			drone["timer"] -= delta
-			if drone["timer"] <= 0.0:
-				drone["state"] = "deposit"
-		elif drone["state"] == "deposit":
-			drone["pos"] = drone["pos"].move_toward(core_pos, speed * delta)
-			if drone["pos"].distance_to(core_pos) < 5.0:
-				# Deposit and reward
+		if drone["laser_active"]:
+			drone["laser_duration"] -= delta
+			if drone["laser_duration"] <= 0.0:
+				drone["laser_active"] = false
+		else:
+			drone["angle"] += drone["orbit_speed"] * delta
+			var target_pos = core_pos + Vector2(cos(drone["angle"]) * drone["orbit_rx"], sin(drone["angle"]) * drone["orbit_ry"])
+			drone["pos"] = drone["pos"].lerp(target_pos, 4.0 * delta)
+			
+			drone["laser_timer"] -= delta
+			if drone["laser_timer"] <= 0.0:
+				# Fire mining laser at core!
+				drone["laser_active"] = true
+				drone["laser_duration"] = 0.3
+				drone["laser_timer"] = randf_range(2.2, 4.0)
+				
+				# Generate resources
 				var power = GameManager.get_click_power()
-				var yield_val = float(int(power * 0.1) + 1)
+				var yield_val = float(int(power * 0.12) + 1)
+				if GameManager.equipped_artifacts.has("cosmic_collector"):
+					yield_val = float(int(yield_val * 1.4) + 1)
 				GameManager.add_resource("space_ore", yield_val)
-				JuiceManager.spawn_floating_text(self, core_pos + Vector2(randf_range(-20,20), randf_range(-20,20)), "+" + str(int(yield_val)), false, Color(0.22, 1.0, 0.08))
+				JuiceManager.spawn_floating_text(self, core_pos + Vector2(randf_range(-30,30), randf_range(-30,30)), "+" + str(int(yield_val)), false, Color(0.0, 0.94, 1.0))
 				
-				# Minor core squash
-				$HUD/VBoxContainer/CoreContainer/AsteroidCore.current_scale = Vector2(0.92, 0.92)
+				# Squash core on impact
+				$HUD/VBoxContainer/CoreContainer/AsteroidCore.current_scale = Vector2(0.93, 0.93)
 				
-				# Select new target
-				drone["state"] = "mining"
-				drone["target"] = Vector2(randf_range(40.0, 500.0), randf_range(180.0, 520.0))
+				# Soft sound effect
+				SoundManager.play_sound(SoundManager.click_stream, 0.015, -8.0, 1.6)
 				
 	if target_count > 0:
 		drone_container.queue_redraw()
@@ -373,12 +458,16 @@ func _on_drone_container_draw() -> void:
 	for drone in drones:
 		var pos = drone["pos"]
 		
-		# Calculate rotation angle facing target!
+		# Calculate rotation angle facing core center!
 		var angle = 0.0
-		if drone["state"] == "mining" and drone["target"] != pos:
-			angle = (drone["target"] - pos).angle() + PI/2 # Face up (texture is facing up)
-		elif drone["state"] == "deposit" and core_center_pos != pos:
+		if core_center_pos != pos:
 			angle = (core_center_pos - pos).angle() + PI/2
+			
+		# Draw visible laser beam
+		if drone["laser_active"]:
+			var alpha = drone["laser_duration"] / 0.3
+			drone_container.draw_line(pos, core_center_pos, Color(0.0, 0.94, 1.0, alpha * 0.7), 2.5)
+			drone_container.draw_line(pos, core_center_pos, Color(1.0, 1.0, 1.0, alpha * 0.9), 1.0)
 			
 		# Draw spaceship texture
 		if drone_ship_tex:
@@ -386,8 +475,8 @@ func _on_drone_container_draw() -> void:
 			# Set local drawing transform
 			drone_container.draw_set_transform(pos, angle, Vector2.ONE)
 			
-			# Draw engine fire effect behind the ship if moving
-			if drone_fire_tex and (drone["state"] == "mining" or drone["state"] == "deposit"):
+			# Draw engine fire effect behind the ship
+			if drone_fire_tex and not drone["laser_active"]:
 				var fire_size = Vector2(8, 12)
 				# Offset so fire is drawn behind the ship's engine nozzle (nozzle is at bottom y = size.y/2 = 12)
 				drone_container.draw_texture_rect(drone_fire_tex, Rect2(-fire_size.x/2, size.y/2 - 2, fire_size.x, fire_size.y), false)
@@ -494,15 +583,18 @@ func select_tab(index: int) -> void:
 	var tabs = [tab_upgrades, tab_automation, tab_skilltree, tab_singularity, tab_prestige, tab_achievements]
 	var active_tab = tabs[index]
 	
-	# Slide-in transition for active tab
+	# Slide-in transition for active tab with elastic scale and vertical offset
 	tween_tabs = create_tween().set_parallel(true)
 	for t in tabs:
 		if t == active_tab:
 			t.visible = true
 			t.modulate.a = 0.0
-			t.position.x = 20.0
-			tween_tabs.tween_property(t, "modulate:a", 1.0, 0.22)
-			tween_tabs.tween_property(t, "position:x", 0.0, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			t.position.y = 35.0
+			t.scale = Vector2(0.96, 0.96)
+			t.pivot_offset = t.size / 2.0
+			tween_tabs.tween_property(t, "modulate:a", 1.0, 0.28).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			tween_tabs.tween_property(t, "position:y", 0.0, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tween_tabs.tween_property(t, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		else:
 			t.visible = false
 			
@@ -811,6 +903,22 @@ func _update_all_labels() -> void:
 	collapse_progress_bar.max_value = 100000.0
 	collapse_progress_bar.value = clamp(GameManager.space_ore, 0.0, 100000.0)
 	
+	# Update Sector Progress Bar & Label
+	if sector_progress_bar:
+		var target = GameManager.get_sector_target()
+		sector_label.text = "SEKTOR: %d" % GameManager.current_sector
+		sector_progress_bar.max_value = target
+		sector_progress_bar.value = clamp(GameManager.space_ore, 0.0, target)
+		
+		# Show travel button if goal is reached!
+		if GameManager.space_ore >= target:
+			travel_btn.visible = true
+			if not travel_btn.get_meta("is_bouncing", false):
+				travel_btn.set_meta("is_bouncing", true)
+				_bounce_button(travel_btn)
+		else:
+			travel_btn.visible = false
+	
 	# Update Singularity Chamber UI
 	dm_amount_lbl.text = "Dark Matter: %.3f" % GameManager.dark_matter
 	invest_title_lbl.text = "Stardust Invested: " + _format_number(GameManager.stardust_invested)
@@ -840,6 +948,7 @@ func _on_core_clicked(click_pos: Vector2, is_crit: bool, _ore_amount: float) -> 
 	# Apply shockwave click ripples & dust repulsion vector lines
 	var color_to_pass = Color(1.0, 0.84, 0.0) if is_crit else Color(0.0, 0.94, 1.0)
 	$HUD/Background.apply_click_displacement(global_click_pos, color_to_pass)
+	$HUD/Background.spawn_debris(global_click_pos, is_crit)
 
 	if supernova_alert_active:
 		var ring_scale = $HUD/VBoxContainer/CoreContainer/AsteroidCore.supernova_ring_scale
@@ -1354,6 +1463,21 @@ func _on_comet_clicked(comet: Button) -> void:
 		JuiceManager.spawn_floating_text(self, pos + Vector2(-60, -30), "+5 Gas", false, Color(1.0, 0.0, 0.5))
 	if extra_crystals > 0:
 		JuiceManager.spawn_floating_text(self, pos + Vector2(60, -30), "+1 Kristall", true, Color(1.0, 0.84, 0.0))
+		
+	# Artifact drop check (25% chance if there are locked artifacts left)
+	if randf() <= 0.25:
+		var locked_artifacts = []
+		for art_id in GameManager.ARTIFACTS_CONFIG.keys():
+			if not GameManager.unlocked_artifacts.has(art_id):
+				locked_artifacts.append(art_id)
+		
+		if locked_artifacts.size() > 0:
+			var roll = locked_artifacts[randi() % locked_artifacts.size()]
+			GameManager.unlocked_artifacts.append(roll)
+			var title = GameManager.ARTIFACTS_CONFIG[roll]["title"]
+			JuiceManager.spawn_floating_text(self, pos + Vector2(0, -65), "ARTEFAKT GEFUNDEN:\n" + title, true, Color(1.0, 0.84, 0.0), 3)
+			GameManager.save_game()
+			rebuild_achievements_list()
 
 func _create_achievements_ui() -> void:
 	# 1. Programmatically create AchievementsPanel (ScrollContainer)
@@ -1413,12 +1537,142 @@ func _create_achievements_ui() -> void:
 		achievements_tab_btn.expand_icon = true
 		achievements_tab_btn.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
 
+func _on_artifact_btn_pressed(art_id: String) -> void:
+	if GameManager.equipped_artifacts.has(art_id):
+		GameManager.equipped_artifacts.erase(art_id)
+		JuiceManager.spawn_floating_text(self, Vector2(270, 480), "ARTEFAKT ABGELEGT", false, Color(1.0, 0.0, 0.5), 1)
+	else:
+		if GameManager.equipped_artifacts.size() >= 2:
+			JuiceManager.spawn_floating_text(self, Vector2(270, 480), "MAXIMALE ARTEFAKTE AUSGERÜSTET (2)", true, Color(1.0, 0.0, 0.5), 1)
+			return
+		GameManager.equipped_artifacts.append(art_id)
+		JuiceManager.spawn_floating_text(self, Vector2(270, 480), "ARTEFAKT AUSGERÜSTET", true, Color(0.0, 0.94, 1.0), 2)
+		
+	GameManager.save_game()
+	rebuild_achievements_list()
+	_update_all_labels()
+
 func rebuild_achievements_list() -> void:
 	if not achievements_list:
 		return
 		
 	for child in achievements_list.get_children():
 		child.queue_free()
+		
+	# ----------------- ARTIFAKTE SEKTION AN HIER -----------------
+	var art_header = Label.new()
+	art_header.text = "KOSMISCHE ARTEFAKTE (Max. 2 Ausgerüstet)"
+	art_header.add_theme_font_size_override("font_size", 11)
+	art_header.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0)) # Gold
+	art_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	achievements_list.add_child(art_header)
+	
+	# Draw active artifacts
+	for art_id in GameManager.ARTIFACTS_CONFIG.keys():
+		var art_cfg = GameManager.ARTIFACTS_CONFIG[art_id]
+		var is_unlocked = GameManager.unlocked_artifacts.has(art_id)
+		var is_equipped = GameManager.equipped_artifacts.has(art_id)
+		
+		var card = PanelContainer.new()
+		var card_style = StyleBoxFlat.new()
+		card_style.border_width_left = 2
+		card_style.border_width_right = 2
+		card_style.border_width_top = 2
+		card_style.border_width_bottom = 2
+		card_style.corner_radius_top_left = 6
+		card_style.corner_radius_top_right = 6
+		card_style.corner_radius_bottom_left = 6
+		card_style.corner_radius_bottom_right = 6
+		
+		if is_equipped:
+			card_style.bg_color = Color(0.04, 0.16, 0.25, 0.8) # Neon Dark Blue
+			card_style.border_color = Color(0.0, 0.94, 1.0, 0.7) # Cyan glow border
+			card_style.shadow_color = Color(0.0, 0.94, 1.0, 0.2)
+			card_style.shadow_size = 4
+		elif is_unlocked:
+			card_style.bg_color = Color(0.12, 0.08, 0.18, 0.8) # Dark Purple
+			card_style.border_color = Color(1.0, 0.0, 0.5, 0.4) # Pink border
+		else:
+			card_style.bg_color = Color(0.08, 0.08, 0.09, 0.6)
+			card_style.border_color = Color(0.2, 0.2, 0.2, 0.2)
+			
+		card.add_theme_stylebox_override("panel", card_style)
+		card.mouse_filter = Control.MOUSE_FILTER_PASS
+		achievements_list.add_child(card)
+		
+		var hbox = HBoxContainer.new()
+		hbox.add_theme_constant_override("separation", 10)
+		card.add_child(hbox)
+		
+		var icon_rect = TextureRect.new()
+		icon_rect.mouse_filter = Control.MOUSE_FILTER_PASS
+		icon_rect.custom_minimum_size = Vector2(32, 32)
+		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		
+		var icon_path = "res://assets/Kenney/kenney_space-shooter-remastered/PNG/Effects/star1.png"
+		if is_equipped:
+			icon_path = "res://assets/Kenney/kenney_space-shooter-remastered/PNG/Effects/star2.png"
+		if ResourceLoader.exists(icon_path):
+			icon_rect.texture = load(icon_path)
+		hbox.add_child(icon_rect)
+		
+		var vbox = VBoxContainer.new()
+		vbox.size_flags_horizontal = Control.SizeFlags.SIZE_EXPAND_FILL
+		vbox.add_theme_constant_override("separation", 2)
+		hbox.add_child(vbox)
+		
+		var title_lbl = Label.new()
+		title_lbl.text = art_cfg["title"] if is_unlocked else "??? (Gesperrt)"
+		title_lbl.add_theme_font_size_override("font_size", 11)
+		title_lbl.add_theme_color_override("font_color", Color(0.0, 0.94, 1.0) if is_unlocked else Color(0.4, 0.4, 0.4))
+		vbox.add_child(title_lbl)
+		
+		var desc_lbl = Label.new()
+		desc_lbl.text = art_cfg["desc"] if is_unlocked else "Besiege fliegende Kometen, um dieses Artefakt zu bergen!"
+		desc_lbl.add_theme_font_size_override("font_size", 9)
+		desc_lbl.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8) if is_unlocked else Color(0.5, 0.5, 0.5))
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+		vbox.add_child(desc_lbl)
+		
+		if is_unlocked:
+			var eq_btn = Button.new()
+			eq_btn.text = "ABLEGEN" if is_equipped else "AUSRÜSTEN"
+			eq_btn.custom_minimum_size = Vector2(85, 26)
+			eq_btn.size_flags_vertical = Control.SizeFlags.SIZE_SHRINK_CENTER
+			eq_btn.add_theme_font_size_override("font_size", 9)
+			
+			var btn_style = StyleBoxFlat.new()
+			btn_style.bg_color = Color(1.0, 0.0, 0.5, 0.3) if is_equipped else Color(0.0, 0.94, 1.0, 0.15)
+			btn_style.border_width_left = 1
+			btn_style.border_width_right = 1
+			btn_style.border_width_top = 1
+			btn_style.border_width_bottom = 1
+			btn_style.border_color = Color(1.0, 0.0, 0.5, 0.7) if is_equipped else Color(0.0, 0.94, 1.0, 0.4)
+			btn_style.corner_radius_top_left = 4
+			btn_style.corner_radius_top_right = 4
+			btn_style.corner_radius_bottom_right = 4
+			btn_style.corner_radius_bottom_left = 4
+			eq_btn.add_theme_stylebox_override("normal", btn_style)
+			
+			eq_btn.pressed.connect(func():
+				_on_artifact_btn_pressed(art_id)
+			)
+			hbox.add_child(eq_btn)
+			
+	# Separator line
+	var sep = ColorRect.new()
+	sep.custom_minimum_size = Vector2(0, 2)
+	sep.color = Color(0.2, 0.2, 0.25, 0.4)
+	achievements_list.add_child(sep)
+	
+	var ach_header = Label.new()
+	ach_header.text = "ERFOLGE & MEILENSTEINE"
+	ach_header.add_theme_font_size_override("font_size", 11)
+	ach_header.add_theme_color_override("font_color", Color(0.22, 1.0, 0.08))
+	ach_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	achievements_list.add_child(ach_header)
+	# ----------------- ARTIFAKTE SEKTION ENDE -----------------
 		
 	for id in GameManager.ACHIEVEMENTS_CONFIG.keys():
 		var config = GameManager.ACHIEVEMENTS_CONFIG[id]
@@ -1625,3 +1879,215 @@ func _configure_scroll_mouse_filters(node: Node) -> void:
 				node.mouse_filter = Control.MOUSE_FILTER_PASS
 	for child in node.get_children():
 		_configure_scroll_mouse_filters(child)
+
+func _create_sector_ui() -> void:
+	sector_label = Label.new()
+	sector_label.name = "SectorLabel"
+	sector_label.text = "SEKTOR: 1"
+	sector_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sector_label.add_theme_font_size_override("font_size", 10)
+	sector_label.add_theme_color_override("font_color", Color(0.0, 0.94, 1.0))
+	
+	var vbox = $HUD/VBoxContainer
+	vbox.add_child(sector_label)
+	vbox.move_child(sector_label, 2)
+	
+	sector_progress_bar = ProgressBar.new()
+	sector_progress_bar.name = "SectorProgressBar"
+	sector_progress_bar.custom_minimum_size = Vector2(0, 12)
+	sector_progress_bar.layout_mode = 2
+	sector_progress_bar.show_percentage = true
+	sector_progress_bar.add_theme_font_size_override("font_size", 9)
+	
+	var pbar_bg = StyleBoxFlat.new()
+	pbar_bg.bg_color = Color(0.04, 0.02, 0.08, 0.9)
+	pbar_bg.border_width_left = 1
+	pbar_bg.border_width_right = 1
+	pbar_bg.border_width_top = 1
+	pbar_bg.border_width_bottom = 1
+	pbar_bg.border_color = Color(0.0, 0.94, 1.0, 0.2)
+	pbar_bg.corner_radius_top_left = 3
+	pbar_bg.corner_radius_top_right = 3
+	pbar_bg.corner_radius_bottom_right = 3
+	pbar_bg.corner_radius_bottom_left = 3
+	
+	var pbar_fill = StyleBoxFlat.new()
+	pbar_fill.bg_color = Color(0.0, 0.94, 1.0, 1.0)
+	pbar_fill.border_width_left = 1
+	pbar_fill.border_width_top = 1
+	pbar_fill.border_width_bottom = 1
+	pbar_fill.border_color = Color(0.3, 0.95, 1.0, 0.6)
+	pbar_fill.corner_radius_top_left = 3
+	pbar_fill.corner_radius_top_right = 3
+	pbar_fill.corner_radius_bottom_right = 3
+	pbar_fill.corner_radius_bottom_left = 3
+	pbar_fill.shadow_color = Color(0.0, 0.94, 1.0, 0.45)
+	pbar_fill.shadow_size = 6
+	
+	sector_progress_bar.add_theme_stylebox_override("background", pbar_bg)
+	sector_progress_bar.add_theme_stylebox_override("fill", pbar_fill)
+	
+	vbox.add_child(sector_progress_bar)
+	vbox.move_child(sector_progress_bar, 3)
+	
+	travel_btn = Button.new()
+	travel_btn.name = "TravelBtn"
+	travel_btn.text = "REISE ZUM NÄCHSTEN SEKTOR"
+	travel_btn.visible = false
+	travel_btn.custom_minimum_size = Vector2(220, 42)
+	travel_btn.layout_mode = 1
+	
+	travel_btn.anchors_preset = Control.LayoutPreset.PRESET_CENTER
+	travel_btn.anchor_left = 0.5
+	travel_btn.anchor_top = 0.5
+	travel_btn.anchor_right = 0.5
+	travel_btn.anchor_bottom = 0.5
+	travel_btn.offset_left = -110.0
+	travel_btn.offset_top = 100.0
+	travel_btn.offset_right = 110.0
+	travel_btn.offset_bottom = 142.0
+	travel_btn.grow_horizontal = Control.GrowDirection.GROW_DIRECTION_BOTH
+	travel_btn.grow_vertical = Control.GrowDirection.GROW_DIRECTION_BOTH
+	
+	var btn_style = StyleBoxFlat.new()
+	btn_style.bg_color = Color(0.06, 0.04, 0.12, 0.9)
+	btn_style.border_width_left = 2
+	btn_style.border_width_right = 2
+	btn_style.border_width_top = 2
+	btn_style.border_width_bottom = 2
+	btn_style.border_color = Color(0.0, 0.94, 1.0, 1.0)
+	btn_style.corner_radius_top_left = 8
+	btn_style.corner_radius_top_right = 8
+	btn_style.corner_radius_bottom_right = 8
+	btn_style.corner_radius_bottom_left = 8
+	btn_style.shadow_color = Color(0.0, 0.94, 1.0, 0.4)
+	btn_style.shadow_size = 8
+	
+	var btn_hover = btn_style.duplicate()
+	btn_hover.bg_color = Color(0.1, 0.06, 0.2, 0.95)
+	btn_hover.border_color = Color(1.0, 0.0, 0.5, 1.0)
+	btn_hover.shadow_color = Color(1.0, 0.0, 0.5, 0.4)
+	
+	travel_btn.add_theme_stylebox_override("normal", btn_style)
+	travel_btn.add_theme_stylebox_override("hover", btn_hover)
+	travel_btn.add_theme_stylebox_override("pressed", btn_style)
+	travel_btn.add_theme_font_size_override("font_size", 11)
+	
+	travel_btn.pressed.connect(_on_travel_pressed)
+	$HUD.add_child(travel_btn)
+
+func _bounce_button(btn: Button) -> void:
+	if not btn or not btn.visible:
+		btn.set_meta("is_bouncing", false)
+		return
+	var t = btn.create_tween()
+	t.tween_property(btn, "scale", Vector2(1.05, 1.05), 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	t.tween_property(btn, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	t.finished.connect(func(): _bounce_button(btn))
+
+func _on_travel_pressed() -> void:
+	var travel_scene_path = "res://scenes/TravelScene.tscn"
+	if ResourceLoader.exists(travel_scene_path):
+		var ts_scene = load(travel_scene_path)
+		var ts_instance = ts_scene.instantiate()
+		add_child(ts_instance)
+		ts_instance.travel_completed.connect(_on_travel_completed)
+		$HUD/VBoxContainer.visible = false
+
+func _on_travel_completed() -> void:
+	$HUD/VBoxContainer.visible = true
+	GameManager.current_sector += 1
+	GameManager.space_ore = 0.0
+	
+	var core_node = $HUD/VBoxContainer/CoreContainer/AsteroidCore
+	if core_node:
+		var rng = RandomNumberGenerator.new()
+		rng.randomize()
+		var colors = [
+			Color(0.0, 0.94, 1.0),   # Cyan
+			Color(1.0, 0.0, 0.5),   # Pink
+			Color(1.0, 0.84, 0.0),  # Gold
+			Color(0.22, 1.0, 0.08), # Neon Green
+			Color(0.7, 0.2, 1.0)    # Neon Purple
+		]
+		core_node.border_color = colors[rng.randi() % colors.size()]
+		core_node.glow_color = core_node.border_color
+		core_node.glow_color.a = 0.25
+		
+		core_node.generate_asteroid_shape()
+		
+	_update_all_labels()
+	GameManager.save_game()
+	
+	JuiceManager.spawn_floating_text(self, Vector2(270, 480), "SEKTOR %d ERREICHT!" % GameManager.current_sector, true, Color(1.0, 0.84, 0.0), 3)
+
+# ----------------- INNER CLASSES -----------------
+
+class PlasmaBubble extends Control:
+	signal popped(bubble)
+	
+	var base_radius: float = 24.0
+	var pulse_time: float = 0.0
+	var speed: float = 0.0
+	var dir: Vector2 = Vector2.ZERO
+	var main_ref: Node
+	var color: Color = Color(1.0, 0.0, 0.5)
+	
+	func _ready() -> void:
+		custom_minimum_size = Vector2(80, 80)
+		pivot_offset = Vector2(40, 40)
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		
+		# Random slow movements
+		dir = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)).normalized()
+		speed = randf_range(40.0, 85.0)
+		
+		# Pulsing animation scale tween
+		var t = create_tween().set_loops()
+		t.tween_property(self, "scale", Vector2(1.15, 1.15), 0.45).set_trans(Tween.TRANS_SINE)
+		t.tween_property(self, "scale", Vector2(0.9, 0.9), 0.45).set_trans(Tween.TRANS_SINE)
+
+	func _process(delta: float) -> void:
+		position += dir * speed * delta
+		
+		# Bounce off screen viewport boundaries (540x960 layout limits)
+		if position.x < 30.0:
+			position.x = 30.0
+			dir.x *= -1.0
+		elif position.x > 450.0: # Width is 540, minus size 80
+			position.x = 450.0
+			dir.x *= -1.0
+			
+		if position.y < 120.0:
+			position.y = 120.0
+			dir.y *= -1.0
+		elif position.y > 800.0: # Height is 960, minus size 80 and navigation/headers space
+			position.y = 800.0
+			dir.y *= -1.0
+			
+		queue_redraw()
+		
+	func _draw() -> void:
+		var center = Vector2(40, 40)
+		# Outer neon glow layers
+		for i in range(3):
+			var r = base_radius - float(i) * 5.0
+			var c = color
+			c.a = 0.12 + float(i) * 0.14
+			draw_circle(center, r, c)
+			
+		# Sharp outline
+		draw_arc(center, base_radius, 0.0, TAU, 32, Color(1.0, 1.0, 1.0, 0.85), 2.0, true)
+		# Shiny bubble reflection highlight
+		draw_circle(center - Vector2(8, 8), 4.0, Color(1.0, 1.0, 1.0, 0.65))
+		
+	func _gui_input(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			pop()
+			
+	func pop() -> void:
+		popped.emit(self)
+		if main_ref:
+			JuiceManager.spawn_spark_burst(main_ref, global_position + Vector2(40, 40), color)
+			SoundManager.play_sound(SoundManager.crit_stream, 0.04, -2.0, 1.45)
+		queue_free()

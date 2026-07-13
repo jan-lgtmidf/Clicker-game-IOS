@@ -43,6 +43,11 @@ var stardust_invested: float = 0.0:
 var lifetime_space_ore: float = 0.0
 var lifetime_stardust: float = 0.0
 
+var current_sector: int = 1
+
+func get_sector_target() -> float:
+	return 1000.0 * pow(5.0, float(current_sector - 1))
+
 # Stats tracking for achievements
 var stats: Dictionary = {
 	"manual_clicks": 0.0,
@@ -54,6 +59,42 @@ var stats: Dictionary = {
 }
 
 var unlocked_achievements: Array = []
+
+var unlocked_artifacts: Array = []
+var equipped_artifacts: Array = []
+
+const ARTIFACTS_CONFIG: Dictionary = {
+	"dark_matter_mirror": {
+		"title": "Dunkelmaterie-Spiegel",
+		"desc": "+15% Krit-Chance auf Klicks.",
+		"buff_type": "crit_chance",
+		"buff_val": 0.15
+	},
+	"crystal_amplifier": {
+		"title": "Kristall-Verstärker",
+		"desc": "+25% globaler passiver Ressourcenertrag.",
+		"buff_type": "passive_mult",
+		"buff_val": 0.25
+	},
+	"grav_anchor": {
+		"title": "Gravitations-Anker",
+		"desc": "Kernschmelze-Abkühlzeit dauert 3 Sek länger.",
+		"buff_type": "meltdown_time",
+		"buff_val": 3.0
+	},
+	"pulse_generator": {
+		"title": "Impuls-Generator",
+		"desc": "+30% Klickkraft.",
+		"buff_type": "click_power_mult",
+		"buff_val": 0.30
+	},
+	"cosmic_collector": {
+		"title": "Kosmischer Kollektor",
+		"desc": "Drohnen sammeln 40% mehr Erze pro Zyklus.",
+		"buff_type": "drone_yield_mult",
+		"buff_val": 0.40
+	}
+}
 
 const ACHIEVEMENTS_CONFIG: Dictionary = {
 	"first_click": {
@@ -344,6 +385,8 @@ func get_click_power() -> float:
 		mult += 0.25
 	if is_achievement_unlocked("first_click"):
 		mult += 0.01
+	if equipped_artifacts.has("pulse_generator"):
+		mult += 0.30
 	
 	mult += get_global_production_multiplier()
 	return base * mult
@@ -352,7 +395,9 @@ func get_crit_chance() -> float:
 	var base = float(upgrade_levels["crit_chance"]) * 0.01 + 0.05
 	if is_achievement_unlocked("crystals_10"):
 		base += 0.01
-	return min(0.50, base)
+	if equipped_artifacts.has("dark_matter_mirror"):
+		base += 0.15
+	return min(0.65, base)
 
 func get_crit_multiplier() -> float:
 	var base = 2.0 + float(upgrade_levels["crit_multiplier"]) * 0.3
@@ -399,6 +444,13 @@ func get_global_production_multiplier() -> float:
 	mult += perk_levels["global_boost"] * 0.05
 	if is_achievement_unlocked("comets_10"):
 		mult += 0.05
+	
+	# Sektor global production multiplier (+50% per sector beyond 1)
+	mult += float(current_sector - 1) * 0.5
+	
+	if equipped_artifacts.has("crystal_amplifier"):
+		mult += 0.25
+		
 	return mult
 
 # Process idle income
@@ -762,6 +814,7 @@ func save_game() -> void:
 	config.set_value("resources", "stardust_invested", stardust_invested)
 	config.set_value("resources", "lifetime_space_ore", lifetime_space_ore)
 	config.set_value("resources", "lifetime_stardust", lifetime_stardust)
+	config.set_value("resources", "current_sector", current_sector)
 	
 	# Upgrades
 	for up_id in upgrade_levels.keys():
@@ -781,6 +834,10 @@ func save_game() -> void:
 	# Achievements & Stats
 	config.set_value("achievements", "unlocked", unlocked_achievements)
 	config.set_value("achievements", "stats", stats)
+	
+	# Artifacts
+	config.set_value("artifacts", "unlocked", unlocked_artifacts)
+	config.set_value("artifacts", "equipped", equipped_artifacts)
 	
 	# Save time
 	last_save_time = Time.get_unix_time_from_system()
@@ -806,6 +863,7 @@ func load_game() -> void:
 	stardust_invested = float(config.get_value("resources", "stardust_invested", 0.0))
 	lifetime_space_ore = float(config.get_value("resources", "lifetime_space_ore", 0.0))
 	lifetime_stardust = float(config.get_value("resources", "lifetime_stardust", 0.0))
+	current_sector = int(config.get_value("resources", "current_sector", 1))
 	
 	# Upgrades validation against active keys
 	var default_upgrades = {
@@ -871,6 +929,19 @@ func load_game() -> void:
 		for k in stats.keys():
 			if loaded_stats.has(k):
 				stats[k] = float(loaded_stats[k])
+				
+	# Artifacts loading
+	var loaded_unlocked_art = config.get_value("artifacts", "unlocked", [])
+	if typeof(loaded_unlocked_art) == TYPE_ARRAY:
+		unlocked_artifacts = loaded_unlocked_art
+	else:
+		unlocked_artifacts = []
+		
+	var loaded_equipped_art = config.get_value("artifacts", "equipped", [])
+	if typeof(loaded_equipped_art) == TYPE_ARRAY:
+		equipped_artifacts = loaded_equipped_art
+	else:
+		equipped_artifacts = []
 	
 	# Calculate Offline earnings
 	last_save_time = float(config.get_value("meta", "last_save_time", 0.0))

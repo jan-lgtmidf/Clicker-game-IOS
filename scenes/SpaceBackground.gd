@@ -7,6 +7,16 @@ var nebula_particles: Array = []
 var num_stars = 40
 var num_nebulae = 4
 
+var parallax_offset: Vector2 = Vector2.ZERO
+var debris_particles: Array = []
+
+var debris_textures: Array = [
+	preload("res://assets/Kenney/kenney_space-shooter-remastered/PNG/Meteors/meteorBrown_tiny1.png"),
+	preload("res://assets/Kenney/kenney_space-shooter-remastered/PNG/Meteors/meteorBrown_tiny2.png"),
+	preload("res://assets/Kenney/kenney_space-shooter-remastered/PNG/Meteors/meteorGrey_tiny1.png"),
+	preload("res://assets/Kenney/kenney_space-shooter-remastered/PNG/Meteors/meteorGrey_tiny2.png")
+]
+
 var center: Vector2
 var rot_angle: float = 0.0
 
@@ -59,11 +69,13 @@ func _ready() -> void:
 	var rng = RandomNumberGenerator.new()
 	rng.seed = 77
 	for i in range(num_stars):
+		var depth = 0.35 if i < num_stars / 2 else 0.9
 		stars.append({
 			"pos": Vector2(rng.randf_range(-400, 400), rng.randf_range(-500, 500)),
-			"size": rng.randf_range(1.0, 3.5),
+			"size": rng.randf_range(1.0, 2.2) if depth == 0.35 else rng.randf_range(2.0, 3.8),
 			"brightness": rng.randf_range(0.3, 0.95),
-			"speed": rng.randf_range(0.01, 0.04)
+			"speed": rng.randf_range(0.01, 0.04),
+			"depth": depth
 		})
 		
 	for i in range(num_nebulae):
@@ -134,12 +146,56 @@ func apply_click_displacement(click_pos: Vector2, color_tint: Color = Color.WHIT
 			if color_tint != Color.WHITE:
 				dust["color"] = dust["color"].lerp(color_tint, 0.5)
 
+func spawn_debris(pos: Vector2, is_crit: bool) -> void:
+	var num_debris = randi_range(3, 5)
+	for i in range(num_debris):
+		var tex = debris_textures[randi() % debris_textures.size()]
+		var angle = randf_range(0.0, TAU)
+		var speed = randf_range(120.0, 260.0)
+		var vel = Vector2(cos(angle), sin(angle)) * speed
+		# Add a slight upward bias
+		vel.y -= 80.0
+		
+		var p_color = Color(1.0, 1.0, 1.0)
+		if is_crit:
+			p_color = Color(1.0, 0.84, 0.0)
+			
+		debris_particles.append({
+			"texture": tex,
+			"pos": pos,
+			"vel": vel,
+			"rot": randf_range(0.0, TAU),
+			"rot_speed": randf_range(-6.0, 6.0),
+			"scale": randf_range(0.5, 1.0),
+			"color": p_color,
+			"life": 1.0,
+			"fade_speed": randf_range(0.7, 1.3)
+		})
+
 func _process(delta: float) -> void:
 	# Dynamically update the center of the animation to match the Control's size
 	center = size / 2.0
 	
+	# Calculate target parallax offset based on local mouse position relative to center
+	var mouse_pos = get_local_mouse_position()
+	var target_offset = (mouse_pos - center) * -0.06
+	target_offset = target_offset.limit_length(35.0)
+	parallax_offset = parallax_offset.lerp(target_offset, 3.0 * delta)
+	
 	rot_angle += 0.015 * delta * (1.0 + pulse_intensity * 3.0)
 	pulse_intensity = max(0.0, pulse_intensity - 3.5 * delta)
+	
+	# Update physical debris particles physics
+	var active_debris = []
+	for p in debris_particles:
+		p["pos"] += p["vel"] * delta
+		# Add simulated gravity pulling chunks downwards
+		p["vel"].y += 240.0 * delta
+		p["rot"] += p["rot_speed"] * delta
+		p["life"] -= p["fade_speed"] * delta
+		if p["life"] > 0.0:
+			active_debris.append(p)
+	debris_particles = active_debris
 	
 	# Update nebula phases
 	for neb in nebula_particles:
@@ -207,7 +263,7 @@ func _draw() -> void:
 		var src_y = (tex_size.y - src_h) / 2.0
 		var src_rect = Rect2(src_x, src_y, src_w, src_h)
 		
-		draw_texture_rect_region(bg_tex, Rect2(Vector2.ZERO, size), src_rect, Color(0.85, 0.85, 0.95, 1.0))
+		draw_texture_rect_region(bg_tex, Rect2(parallax_offset * 0.08, size), src_rect, Color(0.85, 0.85, 0.95, 1.0))
 	else:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.02, 0.09, 1.0))
 	
@@ -221,9 +277,9 @@ func _draw() -> void:
 		glow_inner.a = pulse_intensity * 0.08
 		draw_circle(center, 120.0, glow_inner)
 	
-	# 1. Draw Nebulae
+	# 1. Draw Nebulae (shifted by minimal parallax)
 	for neb in nebula_particles:
-		var n_center = center + neb["pos"]
+		var n_center = center + neb["pos"] + parallax_offset * 0.15
 		var rad = neb["radius"] + sin(neb["phase"]) * 15.0
 		if pulse_intensity > 0.0:
 			rad += pulse_intensity * 10.0
@@ -241,10 +297,11 @@ func _draw() -> void:
 			step_color.a = col.a * alpha_factor
 			draw_circle(n_center, r, step_color)
 			
-	# 2. Draw Stars
+	# 2. Draw Stars (with deep vs near parallax offsets)
 	var rot_xform = Transform2D(rot_angle, Vector2.ZERO)
 	for star in stars:
-		var rotated_pos = center + rot_xform * star["pos"]
+		var offset = parallax_offset * star["depth"]
+		var rotated_pos = center + rot_xform * star["pos"] + offset
 		var pulse = star["brightness"] * (0.8 + 0.2 * sin(rot_angle * 120.0 * star["speed"]))
 		if pulse_intensity > 0.0:
 			pulse += pulse_intensity * 0.4
@@ -259,9 +316,9 @@ func _draw() -> void:
 		else:
 			draw_circle(rotated_pos, star["size"], c)
 
-	# 3. Draw Interactive Space Dust particles (with vector trails)
+	# 3. Draw Interactive Space Dust particles (with vector trails and near-space parallax)
 	for dust in dust_particles:
-		var p = dust["pos"]
+		var p = dust["pos"] + parallax_offset * 0.85
 		var c = dust["color"]
 		# Make dust glow during pulses
 		if pulse_intensity > 0.0:
@@ -274,6 +331,17 @@ func _draw() -> void:
 			draw_line(p, trail_end, Color(c.r, c.g, c.b, c.a * 0.5), 1.5)
 			
 		draw_circle(p, dust["size"], c)
+		
+	# Draw Physical Debris Chunks
+	for p in debris_particles:
+		var tex = p["texture"]
+		var size_to_draw = tex.get_size() * p["scale"]
+		var color = p["color"]
+		color.a = p["life"]
+		
+		draw_set_transform(p["pos"], p["rot"], Vector2.ONE)
+		draw_texture_rect(tex, Rect2(-size_to_draw / 2.0, size_to_draw), false, color)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		
 	# 4. Draw Expanding Click Ripple Rings (Subtle vector shockwaves)
 	for ripple in ripples:
