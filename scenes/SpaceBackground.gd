@@ -157,10 +157,10 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	# Draw background vacuum with tiled Kenney texture
-	var bg_tex = load("res://assets/Kenney/kenney_space-shooter-remastered/Backgrounds/darkPurple.png")
+	# Draw background vacuum with custom generated high-quality texture
+	var bg_tex = load("res://assets/custom_background.png")
 	if bg_tex:
-		draw_texture_rect(bg_tex, Rect2(Vector2.ZERO, size), true, Color(0.85, 0.85, 0.95, 1.0))
+		draw_texture_rect(bg_tex, Rect2(Vector2.ZERO, size), false, Color(0.85, 0.85, 0.95, 1.0))
 	else:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.02, 0.09, 1.0))
 	
