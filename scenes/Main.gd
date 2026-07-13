@@ -207,6 +207,7 @@ func _ready() -> void:
 	rebuild_automation_lists()
 	rebuild_singularity_upgrades()
 	rebuild_perks_lists()
+	rebuild_achievements_list()
 	_update_prestige_card()
 	setup_skill_tree_buttons()
 	_setup_ui_icons()
