@@ -2061,10 +2061,10 @@ func _on_travel_completed() -> void:
 		GameManager.current_sector = GameManager.unlocked_sector_nodes.size()
 		_pending_travel_node_id = ""
 		
-	# Update SpaceBackground dynamically
+	# Update SpaceBackground dynamically with smooth cross-fade transition
 	var bg_node = $HUD.get_node_or_null("Background")
-	if bg_node and bg_node.has_method("load_sector_background"):
-		bg_node.load_sector_background(GameManager.current_sector_node_id)
+	if bg_node and bg_node.has_method("crossfade_to_background"):
+		bg_node.crossfade_to_background(GameManager.current_sector_node_id)
 		
 	GameManager.space_ore = 0.0
 	

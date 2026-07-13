@@ -1,7 +1,22 @@
 extends Control
 
 # Background Starfield and Nebula Shader simulation
-var bg_tex: Texture2D
+var bg_tex_current: Texture2D
+var bg_tex_next: Texture2D
+var fade_progress: float = 0.0
+var fade_tween: Tween
+
+# Ambient background movement variables
+var ambient_time: float = 0.0
+var current_ambient_offset: Vector2 = Vector2.ZERO
+var current_bg_scale: float = 1.0
+var current_bg_rotation: float = 0.0
+
+# Modulate colors for different sector types
+var current_modulate: Color = Color.WHITE
+var target_modulate: Color = Color.WHITE
+var modulate_tween: Tween
+
 var stars: Array = []
 var nebula_particles: Array = []
 var num_stars = 40
@@ -35,19 +50,32 @@ const NUM_DUST = 30
 # Click Ripple Rings (glowing expanding shockwaves)
 var ripples: Array = []
 
-func load_sector_background(node_id: String) -> void:
-	var path = "res://assets/Backgrounds/bg_sector_" + node_id + ".jpg"
+func _get_modulate_color_for_type(type: String) -> Color:
+	match type:
+		"ore":
+			return Color(1.0, 0.75, 0.5) # Warm golden-orange
+		"gas":
+			return Color(0.6, 1.0, 0.75) # Cool plasma green
+		"crystal":
+			return Color(1.0, 0.65, 0.95) # Mysterious nebula magenta
+		"anomaly":
+			return Color(1.0, 0.35, 0.35) # Warning red anomaly
+		_:
+			return Color.WHITE
+
+func _load_texture_from_path(path: String) -> Texture2D:
+	var loaded_tex: Texture2D = null
 	var loaded = false
 	
 	if FileAccess.file_exists(path):
 		var img = Image.load_from_file(path)
 		if img:
-			bg_tex = ImageTexture.create_from_image(img)
+			loaded_tex = ImageTexture.create_from_image(img)
 			loaded = true
 			
 	# Dynamic load fallback (for export builds and editor assets)
 	if not loaded and ResourceLoader.exists(path):
-		bg_tex = load(path)
+		loaded_tex = load(path)
 		loaded = true
 		
 	if not loaded:
@@ -56,19 +84,62 @@ func load_sector_background(node_id: String) -> void:
 		if FileAccess.file_exists(fallback_path):
 			var img = Image.load_from_file(fallback_path)
 			if img:
-				bg_tex = ImageTexture.create_from_image(img)
+				loaded_tex = ImageTexture.create_from_image(img)
 				loaded = true
 				
 		if not loaded and ResourceLoader.exists(fallback_path):
-			bg_tex = load(fallback_path)
+			loaded_tex = load(fallback_path)
 			loaded = true
 			
 		if not loaded:
 			var default_fallback = "res://assets/Kenney/kenney_space-shooter-remastered/Backgrounds/darkPurple.png"
 			if ResourceLoader.exists(default_fallback):
-				bg_tex = load(default_fallback)
+				loaded_tex = load(default_fallback)
 				
+	return loaded_tex
+
+func load_sector_background(node_id: String) -> void:
+	var path = "res://assets/Backgrounds/bg_sector_" + node_id + ".jpg"
+	bg_tex_current = _load_texture_from_path(path)
+	
+	# Set target colors immediately
+	var sector_type = "normal"
+	if GameManager.STAR_MAP_NODES.has(node_id):
+		sector_type = GameManager.STAR_MAP_NODES[node_id].get("type", "normal")
+	target_modulate = _get_modulate_color_for_type(sector_type)
+	current_modulate = target_modulate
+	
+	fade_progress = 0.0
+	bg_tex_next = null
 	queue_redraw()
+
+func crossfade_to_background(node_id: String) -> void:
+	var path = "res://assets/Backgrounds/bg_sector_" + node_id + ".jpg"
+	bg_tex_next = _load_texture_from_path(path)
+	
+	var sector_type = "normal"
+	if GameManager.STAR_MAP_NODES.has(node_id):
+		sector_type = GameManager.STAR_MAP_NODES[node_id].get("type", "normal")
+	target_modulate = _get_modulate_color_for_type(sector_type)
+	
+	# Cancel existing tweens to prevent cross-over conflicts
+	if fade_tween and fade_tween.is_valid():
+		fade_tween.kill()
+	if modulate_tween and modulate_tween.is_valid():
+		modulate_tween.kill()
+		
+	fade_progress = 0.0
+	fade_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	fade_tween.tween_property(self, "fade_progress", 1.0, 1.5)
+	fade_tween.tween_callback(func():
+		bg_tex_current = bg_tex_next
+		bg_tex_next = null
+		fade_progress = 0.0
+		queue_redraw()
+	)
+	
+	modulate_tween = create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	modulate_tween.tween_property(self, "current_modulate", target_modulate, 1.5)
 
 func _ready() -> void:
 	# Disable minimum size constraint to stretch freely
@@ -205,6 +276,16 @@ func _process(delta: float) -> void:
 	target_offset = target_offset.limit_length(35.0)
 	parallax_offset = parallax_offset.lerp(target_offset, 3.0 * delta)
 	
+	# Ambient drift calculations (elliptical orbit, breathing, slow rotation)
+	ambient_time += delta
+	var target_ambient = Vector2(
+		sin(ambient_time * 0.08) * 16.0,
+		cos(ambient_time * 0.05) * 10.0
+	)
+	current_ambient_offset = current_ambient_offset.lerp(target_ambient, delta * 1.5)
+	current_bg_scale = 1.04 + sin(ambient_time * 0.12) * 0.04
+	current_bg_rotation = deg_to_rad(0.5 * sin(ambient_time * 0.06))
+	
 	rot_angle += 0.015 * delta * (1.0 + pulse_intensity * 3.0)
 	pulse_intensity = max(0.0, pulse_intensity - 3.5 * delta)
 	
@@ -266,27 +347,46 @@ func _process(delta: float) -> void:
 			
 	queue_redraw()
 
+func _draw_bg_texture(tex: Texture2D, opacity: float) -> void:
+	if not tex:
+		return
+	var tex_size = tex.get_size()
+	var screen_ratio = size.x / size.y
+	
+	# Aspect Fill calculation to crop out borders and prevent distortion
+	var src_w = tex_size.x
+	var src_h = tex_size.y
+	
+	if (tex_size.x / tex_size.y) > screen_ratio:
+		# Texture is wider than screen aspect ratio: crop horizontally
+		src_w = tex_size.y * screen_ratio
+	else:
+		# Texture is taller than screen aspect ratio: crop vertically
+		src_h = tex_size.x / screen_ratio
+		
+	var src_x = (tex_size.x - src_w) / 2.0
+	var src_y = (tex_size.y - src_h) / 2.0
+	var src_rect = Rect2(src_x, src_y, src_w, src_h)
+	
+	# Apply hardware transformations centered around screen middle
+	draw_set_transform(center, current_bg_rotation, Vector2(current_bg_scale, current_bg_scale))
+	
+	# Apply parallax and ambient offsets
+	var draw_pos = -center + (parallax_offset * 0.08) + current_ambient_offset
+	var tint = Color(0.85, 0.85, 0.95, 1.0) * current_modulate
+	tint.a = opacity
+	
+	draw_texture_rect_region(tex, Rect2(draw_pos, size), src_rect, tint)
+	
+	# Reset transform back to default identity
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
 func _draw() -> void:
-	if bg_tex:
-		var tex_size = bg_tex.get_size()
-		var screen_ratio = size.x / size.y
-		
-		# Aspect Fill calculation to crop out borders and prevent distortion
-		var src_w = tex_size.x
-		var src_h = tex_size.y
-		
-		if (tex_size.x / tex_size.y) > screen_ratio:
-			# Texture is wider than screen aspect ratio: crop horizontally
-			src_w = tex_size.y * screen_ratio
-		else:
-			# Texture is taller than screen aspect ratio: crop vertically
-			src_h = tex_size.x / screen_ratio
-			
-		var src_x = (tex_size.x - src_w) / 2.0
-		var src_y = (tex_size.y - src_h) / 2.0
-		var src_rect = Rect2(src_x, src_y, src_w, src_h)
-		
-		draw_texture_rect_region(bg_tex, Rect2(parallax_offset * 0.08, size), src_rect, Color(0.85, 0.85, 0.95, 1.0))
+	if fade_progress > 0.0 and bg_tex_next != null:
+		_draw_bg_texture(bg_tex_current, 1.0 - fade_progress)
+		_draw_bg_texture(bg_tex_next, fade_progress)
+	elif bg_tex_current:
+		_draw_bg_texture(bg_tex_current, 1.0)
 	else:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.02, 0.09, 1.0))
 	
