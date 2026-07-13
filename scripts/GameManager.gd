@@ -874,7 +874,7 @@ func load_game() -> void:
 	stardust_invested = float(config.get_value("resources", "stardust_invested", 0.0))
 	lifetime_space_ore = float(config.get_value("resources", "lifetime_space_ore", 0.0))
 	lifetime_stardust = float(config.get_value("resources", "lifetime_stardust", 0.0))
-	current_sector = int(config.get_value("resources", "current_sector", 1))
+	current_sector = max(1, int(config.get_value("resources", "current_sector", 1)))
 	
 	# Upgrades validation against active keys
 	var default_upgrades = {
