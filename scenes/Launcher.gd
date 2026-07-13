@@ -123,10 +123,10 @@ func _on_loader_ring_draw() -> void:
 	var center = loader_ring.size / 2.0
 	
 	# A. Dark circle background plate
-	draw_circle(center, 46.0, Color(0.06, 0.05, 0.1, 0.75))
+	loader_ring.draw_circle(center, 46.0, Color(0.06, 0.05, 0.1, 0.75))
 	
 	# B. Outer subtle glowing orbit track
-	draw_arc(center, 54.0, 0.0, TAU, 48, Color(0.0, 0.94, 1.0, 0.08), 1.5, true)
+	loader_ring.draw_arc(center, 54.0, 0.0, TAU, 48, Color(0.0, 0.94, 1.0, 0.08), 1.5, true)
 	
 	# C. Outer rotating dotted cyan ring (spinner)
 	var dots = 9
@@ -141,7 +141,7 @@ func _on_loader_ring_draw() -> void:
 		
 		# Draw trailing dots slightly smaller
 		var size_factor = 1.0 + alpha * 1.5
-		draw_circle(dot_pos, 1.5 * size_factor, dot_color)
+		loader_ring.draw_circle(dot_pos, 1.5 * size_factor, dot_color)
 		
 	# D. Inner sweeping progress arc (neon pink)
 	if download_percent > 0.0:
@@ -149,18 +149,18 @@ func _on_loader_ring_draw() -> void:
 		var end_angle = start_angle + (download_percent / 100.0) * TAU
 		
 		# Thick backing glow arc
-		draw_arc(center, 44.0, start_angle, end_angle, 64, Color(1.0, 0.0, 0.5, 0.22), 6.5, true)
+		loader_ring.draw_arc(center, 44.0, start_angle, end_angle, 64, Color(1.0, 0.0, 0.5, 0.22), 6.5, true)
 		# Sharp foreground progress arc
 		var arc_color = Color(1.0, 0.0, 0.5, 0.95)
 		# Interpolate arc color towards cyan as it reaches 100%
 		if download_percent > 80.0:
 			var t = (download_percent - 80.0) / 20.0
 			arc_color = Color(1.0, 0.0, 0.5, 0.95).lerp(Color(0.0, 0.94, 1.0, 0.95), t)
-		draw_arc(center, 44.0, start_angle, end_angle, 64, arc_color, 2.5, true)
+		loader_ring.draw_arc(center, 44.0, start_angle, end_angle, 64, arc_color, 2.5, true)
 	else:
 		# Draw a pulsing static inner ring when idle/checking
 		var pulse_alpha = 0.15 + sin(pulse_time * 1.5) * 0.08
-		draw_arc(center, 44.0, 0.0, TAU, 48, Color(1.0, 0.0, 0.5, pulse_alpha), 2.0, true)
+		loader_ring.draw_arc(center, 44.0, 0.0, TAU, 48, Color(1.0, 0.0, 0.5, pulse_alpha), 2.0, true)
 
 func _load_local_version() -> void:
 	if FileAccess.file_exists(LOCAL_VERSION_FILE):
