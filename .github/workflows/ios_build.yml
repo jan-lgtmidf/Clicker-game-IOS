@@ -11,6 +11,11 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
+      - name: Setup Xcode 16
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.2'
+
       - name: Setup Godot 4.6.2
         run: |
           curl -L -o godot.zip "https://github.com/godotengine/godot/releases/download/4.6.2-stable/Godot_v4.6.2-stable_macos.universal.zip"
@@ -44,6 +49,10 @@ jobs:
             echo "Export failed!"
             exit 1
           fi
+          # Failsafe: Remove any automatic signing overrides in the project file
+          sed -i '' 's/CODE_SIGN_IDENTITY = "Apple Distribution"/CODE_SIGN_IDENTITY = "-"/g' ios/AstroForge.xcodeproj/project.pbxproj || true
+          sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = "Apple Distribution"/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = "-"/g' ios/AstroForge.xcodeproj/project.pbxproj || true
+          sed -i '' 's/DEVELOPMENT_TEAM = [A-Za-z0-9]*/DEVELOPMENT_TEAM = ""/g' ios/AstroForge.xcodeproj/project.pbxproj || true
           echo "✅ Export OK"
 
       - name: Build Xcode Project
@@ -53,6 +62,11 @@ jobs:
             | grep -A20 'Schemes:' | grep -v 'Schemes:' | grep -v '^$' | head -1 | xargs)
           [ -z "$SCHEME" ] && SCHEME="AstroForge"
           echo "Building scheme: $SCHEME"
+
+          # Resolve SDK and Toolchain paths to absolute paths
+          DEVELOPER_DIR=$(xcode-select -p)
+          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          TOOLCHAIN_PATH="$DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain"
 
           xcodebuild \
             -project AstroForge.xcodeproj \
@@ -68,7 +82,7 @@ jobs:
             PRODUCT_BUNDLE_IDENTIFIER=com.jan.astroforge \
             ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=YES \
             SWIFT_VERSION=5.0 \
-            LIBRARY_SEARCH_PATHS='$(inherited) $(TOOLCHAIN_DIR)/usr/lib/swift/iphoneos $(SDKROOT)/usr/lib/swift' \
+            LIBRARY_SEARCH_PATHS="$(pwd) $TOOLCHAIN_PATH/usr/lib/swift/iphoneos $SDK_PATH/usr/lib/swift" \
             clean build \
             SYMROOT=$(pwd)/build_output \
             2>&1 | tail -50
