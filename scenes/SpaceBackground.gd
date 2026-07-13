@@ -26,8 +26,14 @@ const NUM_DUST = 30
 var ripples: Array = []
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(540, 960)
-	center = Vector2(270, 480)
+	# Disable minimum size constraint to stretch freely
+	custom_minimum_size = Vector2.ZERO
+	
+	# Initial full-screen setup
+	var view_size = get_viewport_rect().size
+	global_position = Vector2.ZERO
+	size = view_size
+	center = view_size / 2.0
 	
 	# Load custom background with dynamic fallback for editor/exported build compatibility
 	var bg_path = "res://assets/custom_background.jpg"
@@ -123,6 +129,12 @@ func apply_click_displacement(click_pos: Vector2, color_tint: Color = Color.WHIT
 				dust["color"] = dust["color"].lerp(color_tint, 0.5)
 
 func _process(delta: float) -> void:
+	# Maintain full-screen scaling and positioning dynamically
+	var view_size = get_viewport_rect().size
+	global_position = Vector2.ZERO
+	size = view_size
+	center = view_size / 2.0
+	
 	rot_angle += 0.015 * delta * (1.0 + pulse_intensity * 3.0)
 	pulse_intensity = max(0.0, pulse_intensity - 3.5 * delta)
 	
