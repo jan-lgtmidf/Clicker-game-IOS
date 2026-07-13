@@ -213,6 +213,10 @@ func _ready() -> void:
 	_update_tab_visibility()
 	_create_debug_reset_button()
 	_check_offline_popup()
+	
+	# Configure mouse filters on all static panel containers (PrestigeCard, DarkMatterHeader, SkillTree, etc.)
+	# to allow drag scrolling from anywhere on touchscreens.
+	_configure_scroll_mouse_filters(panels_container)
 
 func _process(delta: float) -> void:
 	# Decays spell cooldown timers
@@ -884,6 +888,7 @@ func create_shop_row(title: String, desc: String, cost: float, cost_type: String
 	style.content_margin_top = 8
 	style.content_margin_bottom = 8
 	panel.add_theme_stylebox_override("panel", style)
+	panel.mouse_filter = Control.MOUSE_FILTER_PASS
 	
 	var hbox = HBoxContainer.new()
 	panel.add_child(hbox)
@@ -1437,12 +1442,14 @@ func rebuild_achievements_list() -> void:
 		card_style.corner_radius_bottom_left = 6
 		card_style.corner_radius_bottom_right = 6
 		card.add_theme_stylebox_override("panel", card_style)
+		card.mouse_filter = Control.MOUSE_FILTER_PASS
 		
 		var hbox = HBoxContainer.new()
 		hbox.add_theme_constant_override("separation", 12)
 		card.add_child(hbox)
 		
 		var icon_rect = TextureRect.new()
+		icon_rect.mouse_filter = Control.MOUSE_FILTER_PASS
 		icon_rect.custom_minimum_size = Vector2(40, 40)
 		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -1609,3 +1616,11 @@ func _show_achievement_popup(id: String) -> void:
 	tween.tween_interval(2.5)
 	tween.tween_property(banner, "position:y", -80.0, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	tween.tween_callback(banner.queue_free)
+
+func _configure_scroll_mouse_filters(node: Node) -> void:
+	if node is Control:
+		if not (node is Button or node is TextureButton or node is ScrollContainer):
+			if node.mouse_filter == Control.MOUSE_FILTER_STOP:
+				node.mouse_filter = Control.MOUSE_FILTER_PASS
+	for child in node.get_children():
+		_configure_scroll_mouse_filters(child)
