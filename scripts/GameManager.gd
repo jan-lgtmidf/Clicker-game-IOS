@@ -267,6 +267,12 @@ const SKILL_CONFIG = {
 func _ready() -> void:
 	load_game()
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or \
+	   what == NOTIFICATION_APPLICATION_FOCUS_OUT or \
+	   what == NOTIFICATION_APPLICATION_PAUSED:
+		save_game()
+
 func _process(delta: float) -> void:
 	# Spells timer decay
 	if overdrive_active:
@@ -323,6 +329,7 @@ func buy_upgrade(id: String) -> bool:
 		upgrade_levels[id] += 1
 		stats_changed.emit()
 		SoundManager.play_sound(SoundManager.upgrade_stream, 0.0, -2.0)
+		save_game()
 		return true
 	return false
 
