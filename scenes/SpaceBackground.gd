@@ -189,7 +189,25 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	if bg_tex:
-		draw_texture_rect(bg_tex, Rect2(Vector2.ZERO, size), false, Color(0.85, 0.85, 0.95, 1.0))
+		var tex_size = bg_tex.get_size()
+		var screen_ratio = size.x / size.y
+		
+		# Aspect Fill calculation to crop out borders and prevent distortion
+		var src_w = tex_size.x
+		var src_h = tex_size.y
+		
+		if (tex_size.x / tex_size.y) > screen_ratio:
+			# Texture is wider than screen aspect ratio: crop horizontally
+			src_w = tex_size.y * screen_ratio
+		else:
+			# Texture is taller than screen aspect ratio: crop vertically
+			src_h = tex_size.x / screen_ratio
+			
+		var src_x = (tex_size.x - src_w) / 2.0
+		var src_y = (tex_size.y - src_h) / 2.0
+		var src_rect = Rect2(src_x, src_y, src_w, src_h)
+		
+		draw_texture_rect_region(bg_tex, Rect2(Vector2.ZERO, size), src_rect, Color(0.85, 0.85, 0.95, 1.0))
 	else:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.02, 0.09, 1.0))
 	
