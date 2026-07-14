@@ -155,6 +155,70 @@ func _ready() -> void:
 	offset_right = 0.0
 	offset_bottom = 0.0
 	
+	# Create background shader ColorRect child
+	var bg_rect = ColorRect.new()
+	bg_rect.name = "BgShaderRect"
+	bg_rect.anchor_left = 0.0
+	bg_rect.anchor_top = 0.0
+	bg_rect.anchor_right = 1.0
+	bg_rect.anchor_bottom = 1.0
+	bg_rect.offset_left = 0.0
+	bg_rect.offset_top = 0.0
+	bg_rect.offset_right = 0.0
+	bg_rect.offset_bottom = 0.0
+	add_child(bg_rect)
+	move_child(bg_rect, 0)
+	
+	var shader = Shader.new()
+	shader.code = "shader_type canvas_item;\n" + \
+		"uniform vec4 base_color : source_color = vec4(0.015, 0.008, 0.035, 1.0);\n" + \
+		"uniform vec4 nebula_color1 : source_color = vec4(0.0, 0.75, 1.0, 0.12);\n" + \
+		"uniform vec4 nebula_color2 : source_color = vec4(0.8, 0.0, 0.45, 0.08);\n" + \
+		"uniform float time_speed = 0.03;\n" + \
+		"uniform vec2 parallax_offset = vec2(0.0);\n" + \
+		"float rand(vec2 n) {\n" + \
+		"	return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);\n" + \
+		"}\n" + \
+		"float noise(vec2 p) {\n" + \
+		"	vec2 ip = floor(p);\n" + \
+		"	vec2 u = fract(p);\n" + \
+		"	u = u * u * (3.0 - 2.0 * u);\n" + \
+		"	float res = mix(\n" + \
+		"		mix(rand(ip), rand(ip + vec2(1.0, 0.0)), u.x),\n" + \
+		"		mix(rand(ip + vec2(0.0, 1.0)), rand(ip + vec2(1.0, 1.0)), u.x),\n" + \
+		"		u.y\n" + \
+		"	);\n" + \
+		"	return res * res;\n" + \
+		"}\n" + \
+		"float fbm(vec2 p) {\n" + \
+		"	float v = 0.0;\n" + \
+		"	float a = 0.5;\n" + \
+		"	vec2 shift = vec2(100.0);\n" + \
+		"	for (int i = 0; i < 3; ++i) {\n" + \
+		"		v += a * noise(p);\n" + \
+		"		p = p * 2.0 + shift;\n" + \
+		"		a *= 0.5;\n" + \
+		"	}\n" + \
+		"	return v;\n" + \
+		"}\n" + \
+		"void fragment() {\n" + \
+		"	vec2 p = (UV - 0.5) * 2.0;\n" + \
+		"	p.x *= 0.6;\n" + \
+		"	vec2 uv = p + parallax_offset * 0.08;\n" + \
+		"	float t = TIME * time_speed;\n" + \
+		"	vec2 q = vec2(fbm(uv + vec2(t * 0.4, t * 0.2)), fbm(uv + vec2(-t * 0.3, t * 0.5)));\n" + \
+		"	vec2 r = vec2(fbm(uv + q * 1.2 + vec2(1.7, 9.2) + t * 0.6), fbm(uv + q * 0.8 + vec2(8.3, 2.8) + t * 0.3));\n" + \
+		"	float f = fbm(uv + r * 1.5);\n" + \
+		"	vec4 col = mix(base_color, nebula_color1, clamp(f * 1.8, 0.0, 1.0));\n" + \
+		"	col = mix(col, nebula_color2, clamp(length(q), 0.0, 1.0));\n" + \
+		"	float dist = length(p);\n" + \
+		"	col = mix(col, col * 0.2, clamp(dist * dist * 0.8, 0.0, 1.0));\n" + \
+		"	COLOR = col;\n" + \
+		"}\n"
+	var mat = ShaderMaterial.new()
+	mat.shader = shader
+	bg_rect.material = mat
+	
 	center = size / 2.0
 	
 	# Load current sector background
@@ -241,7 +305,11 @@ func apply_click_displacement(click_pos: Vector2, color_tint: Color = Color.WHIT
 				dust["color"] = dust["color"].lerp(color_tint, 0.5)
 
 func spawn_debris(pos: Vector2, is_crit: bool) -> void:
-	var num_debris = randi_range(3, 5)
+	# Only spawn physical debris chunks on critical hits (and fewer particles: 1-2 instead of 3-5)
+	if not is_crit:
+		return
+		
+	var num_debris = randi_range(1, 2)
 	for i in range(num_debris):
 		var tex = debris_textures[randi() % debris_textures.size()]
 		var angle = randf_range(0.0, TAU)
@@ -275,6 +343,15 @@ func _process(delta: float) -> void:
 	var target_offset = (mouse_pos - center) * -0.06
 	target_offset = target_offset.limit_length(35.0)
 	parallax_offset = parallax_offset.lerp(target_offset, 3.0 * delta)
+	
+	# Pass parameters to the background shader
+	var bg_rect = get_node_or_null("BgShaderRect")
+	if bg_rect and bg_rect.material is ShaderMaterial:
+		bg_rect.material.set_shader_parameter("parallax_offset", parallax_offset)
+		var default_nebula1 = Color(0.0, 0.75, 1.0, 0.12)
+		var default_nebula2 = Color(0.8, 0.0, 0.45, 0.08)
+		bg_rect.material.set_shader_parameter("nebula_color1", default_nebula1 * current_modulate)
+		bg_rect.material.set_shader_parameter("nebula_color2", default_nebula2 * current_modulate)
 	
 	# Ambient drift calculations (elliptical orbit, breathing, slow rotation)
 	ambient_time += delta
@@ -382,13 +459,8 @@ func _draw_bg_texture(tex: Texture2D, opacity: float) -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 func _draw() -> void:
-	if fade_progress > 0.0 and bg_tex_next != null:
-		_draw_bg_texture(bg_tex_current, 1.0 - fade_progress)
-		_draw_bg_texture(bg_tex_next, fade_progress)
-	elif bg_tex_current:
-		_draw_bg_texture(bg_tex_current, 1.0)
-	else:
-		draw_rect(Rect2(Vector2.ZERO, size), Color(0.04, 0.02, 0.09, 1.0))
+	# Draw solid dark cosmic void background instead of busy JPEG image textures
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.01, 0.05, 1.0))
 	
 	# Pulse background glow (subtle)
 	if pulse_intensity > 0.0:
@@ -400,26 +472,6 @@ func _draw() -> void:
 		glow_inner.a = pulse_intensity * 0.08
 		draw_circle(center, 120.0, glow_inner)
 	
-	# 1. Draw Nebulae (shifted by minimal parallax)
-	for neb in nebula_particles:
-		var n_center = center + neb["pos"] + parallax_offset * 0.15
-		var rad = neb["radius"] + sin(neb["phase"]) * 15.0
-		if pulse_intensity > 0.0:
-			rad += pulse_intensity * 10.0
-			
-		var col = neb["color"]
-		if pulse_intensity > 0.0:
-			col = col.lerp(pulse_color, pulse_intensity * 0.15)
-			col.a += pulse_intensity * 0.01
-		
-		var steps = 6
-		for step in range(steps):
-			var r = rad * (float(steps - step) / steps)
-			var alpha_factor = float(step + 1) / steps
-			var step_color = col
-			step_color.a = col.a * alpha_factor
-			draw_circle(n_center, r, step_color)
-			
 	# 2. Draw Stars (with deep vs near parallax offsets)
 	var rot_xform = Transform2D(rot_angle, Vector2.ZERO)
 	for star in stars:
@@ -469,14 +521,14 @@ func _draw() -> void:
 	# 4. Draw Expanding Click Ripple Rings (Subtle vector shockwaves)
 	for ripple in ripples:
 		var draw_col = ripple["color"]
-		draw_col.a = ripple["opacity"] * 0.25
+		draw_col.a = ripple["opacity"] * 0.10
 		
 		# Draw expanding vector ring outline
 		var radius = 40.0 * ripple["scale"]
-		draw_arc(ripple["pos"], radius, 0.0, TAU, 32, draw_col, 1.5, true)
+		draw_arc(ripple["pos"], radius, 0.0, TAU, 32, draw_col, 1.2, true)
 		# Secondary outer ring
-		draw_col.a = ripple["opacity"] * 0.08
-		draw_arc(ripple["pos"], radius + 8.0, 0.0, TAU, 32, draw_col, 1.0, true)
+		draw_col.a = ripple["opacity"] * 0.03
+		draw_arc(ripple["pos"], radius + 8.0, 0.0, TAU, 32, draw_col, 0.8, true)
 
 	# 5. Draw UI Electricity Reactor Borders
 	var left_border_col = Color(0.0, 0.94, 1.0, 0.20)

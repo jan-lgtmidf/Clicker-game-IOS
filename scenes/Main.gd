@@ -7,10 +7,10 @@ extends Control
 
 @onready var collapse_progress_bar: ProgressBar = $HUD/VBoxContainer/CollapseProgressBar
 
-@onready var tab_upgrades: ScrollContainer = $HUD/VBoxContainer/PanelContainer/UpgradesPanel
-@onready var tab_automation: ScrollContainer = $HUD/VBoxContainer/PanelContainer/AutomationPanel
-@onready var tab_skilltree: ScrollContainer = $HUD/VBoxContainer/PanelContainer/SkillTreePanel
-@onready var tab_singularity: ScrollContainer = $HUD/VBoxContainer/PanelContainer/SingularityPanel
+@onready var tab_upgrades: Control = $HUD/VBoxContainer/PanelContainer/UpgradesPanel
+@onready var tab_automation: Control = $HUD/VBoxContainer/PanelContainer/AutomationPanel
+@onready var tab_skilltree: Control = $HUD/VBoxContainer/PanelContainer/SkillTreePanel
+@onready var tab_singularity: Control = $HUD/VBoxContainer/PanelContainer/SingularityPanel
 @onready var tab_prestige: ScrollContainer = $HUD/VBoxContainer/PanelContainer/PrestigePanel
 @onready var panels_container: PanelContainer = $HUD/VBoxContainer/PanelContainer
 
@@ -23,8 +23,8 @@ var travel_btn: Button
 var sector_label: Label
 var _pending_travel_node_id: String = ""
 
-@onready var upgrades_list: VBoxContainer = $HUD/VBoxContainer/PanelContainer/UpgradesPanel/VBox
-@onready var automation_list: VBoxContainer = $HUD/VBoxContainer/PanelContainer/AutomationPanel/VBox
+var upgrades_list: Control = null
+var automation_list: Control = null
 @onready var perks_list: VBoxContainer = $HUD/VBoxContainer/PanelContainer/PrestigePanel/VBox/PerksList
 
 var drone_ship_tex = preload("res://assets/Kenney/kenney_space-shooter-remastered/PNG/playerShip1_blue.png")
@@ -32,10 +32,10 @@ var drone_fire_tex = preload("res://assets/Kenney/kenney_space-shooter-remastere
 var core_center_pos: Vector2 = Vector2.ZERO
 
 # Singularity Tab Elements
-@onready var dm_amount_lbl: Label = $HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/DarkMatterHeader/VBox/DMAmount
-@onready var invest_title_lbl: Label = $HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/DarkMatterHeader/VBox/InvestTitle
-@onready var invest_btn: Button = $HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/DarkMatterHeader/VBox/InvestBtn
-@onready var singularity_upgrades_list: VBoxContainer = $HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/UpgradesList
+@onready var dm_amount_lbl: Label = $HUD/VBoxContainer/PanelContainer/SingularityPanel/DarkMatterHeader/VBox/DMAmount
+@onready var invest_title_lbl: Label = $HUD/VBoxContainer/PanelContainer/SingularityPanel/DarkMatterHeader/VBox/InvestTitle
+@onready var invest_btn: Button = $HUD/VBoxContainer/PanelContainer/SingularityPanel/DarkMatterHeader/VBox/InvestBtn
+@onready var singularity_upgrades_list: Control = $HUD/VBoxContainer/PanelContainer/SingularityPanel/UpgradesList
 
 # Spells Action Bar Elements
 @onready var spell_overdrive_btn: Button = $HUD/VBoxContainer/SpellsBar/OverdriveBtn
@@ -66,6 +66,11 @@ var core_center_pos: Vector2 = Vector2.ZERO
 @onready var pending_label: Label = $HUD/VBoxContainer/PanelContainer/PrestigePanel/VBox/PrestigeCard/VBox/PendingLabel
 
 @onready var camera: Camera2D = $GameCamera
+
+# HUD Info-Panel Elements
+@onready var info_title_lbl: Label = $HUD/VBoxContainer/InfoPanel/VBox/HBox/InfoTitle
+@onready var info_cost_lbl: Label = $HUD/VBoxContainer/InfoPanel/VBox/HBox/InfoCost
+@onready var info_desc_lbl: Label = $HUD/VBoxContainer/InfoPanel/VBox/InfoDesc
 
 # active diagnostic trackers
 var last_click_tier: int = 0
@@ -104,6 +109,18 @@ var tween_telemetry: Tween
 var tween_tabs: Tween
 
 func _ready() -> void:
+	# Initialize HexBoard types programmatically to avoid scene loading editor order crashes
+	$HUD/VBoxContainer/PanelContainer/UpgradesPanel.board_type = "click"
+	$HUD/VBoxContainer/PanelContainer/AutomationPanel.board_type = "automation"
+	$HUD/VBoxContainer/PanelContainer/SkillTreePanel.board_type = "skill"
+	$HUD/VBoxContainer/PanelContainer/SingularityPanel/UpgradesList.board_type = "singularity"
+	
+	# Connect HexBoard hover signals to HUD Info-Panel
+	$HUD/VBoxContainer/PanelContainer/UpgradesPanel.node_hovered.connect(_on_hex_node_hovered)
+	$HUD/VBoxContainer/PanelContainer/AutomationPanel.node_hovered.connect(_on_hex_node_hovered)
+	$HUD/VBoxContainer/PanelContainer/SkillTreePanel.node_hovered.connect(_on_hex_node_hovered)
+	$HUD/VBoxContainer/PanelContainer/SingularityPanel/UpgradesList.node_hovered.connect(_on_hex_node_hovered)
+	
 	# Connect GameManager signals
 	GameManager.resource_changed.connect(_on_resource_changed)
 	GameManager.stats_changed.connect(_on_stats_changed)
@@ -202,7 +219,7 @@ func _ready() -> void:
 	$HUD/VBoxContainer/PanelContainer/PrestigePanel/VBox/PrestigeCard/VBox/Desc.text = "Setze alle aktuellen Gegenstände und Ressourcen zurück, um rohen Sternenstaub freizusetzen. Jeder Sternenstaub erhöht die globale Produktionsgeschwindigkeit permanent um +2%."
 	$HUD/VBoxContainer/PanelContainer/PrestigePanel/VBox/PerksHeading.text = "PERMANENTE STERNENSTAUB-PERKS"
 	
-	$HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/DarkMatterHeader/VBox/Title.text = "SINGULARITÄTS-KAMMER"
+	$HUD/VBoxContainer/PanelContainer/SingularityPanel/DarkMatterHeader/VBox/Title.text = "SINGULARITÄTS-KAMMER"
 	$HUD/OfflineModal/Center/Card/VBox/Welcome.text = "WILLKOMMEN ZURÜCK, COMMANDER"
 	$HUD/OfflineModal/Center/Card/VBox/ConfirmBtn.text = "DATEN BERGEN"
 	
@@ -247,6 +264,66 @@ func _process(delta: float) -> void:
 		target_music = "overdrive"
 	SoundManager.transition_music_to(target_music)
 
+const HexButtonScript = preload("res://scenes/HexButton.gd")
+
+func _on_hex_node_hovered(id: String, type: String, is_hovered: bool) -> void:
+	if not is_hovered:
+		info_title_lbl.text = "Upgrade-Details"
+		info_title_lbl.self_modulate = Color(0, 0.94, 1.0)
+		info_cost_lbl.text = ""
+		info_desc_lbl.text = "Bewege den Mauszeiger über ein Upgrade für Details."
+		return
+		
+	var title = ""
+	var desc = ""
+	var cost_text = ""
+	var text_color = Color(0.05, 0.55, 1.0) # Blue
+	
+	if type == "upgrade":
+		title = HexButtonScript.UPGRADE_NAMES.get(id, id)
+		desc = GameManager.UPGRADE_DESCRIPTIONS.get(id, "")
+		var cost = GameManager.get_upgrade_cost(id)
+		var cost_type = GameManager.get_upgrade_cost_type(id)
+		var formatted_type = _format_cost_type(cost_type)
+		cost_text = "Kosten: %s %s" % [_format_number(cost), formatted_type]
+		
+		if id in ["click_power", "crit_chance", "crit_multiplier"]:
+			text_color = Color(0.05, 0.55, 1.0) # Blue
+		else:
+			text_color = Color(0.0, 0.85, 0.35) # Green
+			
+	elif type == "skill":
+		var config = GameManager.SKILL_CONFIG.get(id, {})
+		title = config.get("name", id)
+		desc = config.get("desc", "")
+		var cost = config.get("cost", 0.0)
+		var cost_type = config.get("cost_type", "")
+		var formatted_type = _format_cost_type(cost_type)
+		cost_text = "Kosten: %s %s" % [_format_number(cost), formatted_type]
+		text_color = Color(1.0, 0.65, 0.0) # Orange
+		
+	elif type == "singularity":
+		var config = GameManager.SINGULARITY_CONFIG.get(id, {})
+		title = config.get("name", id)
+		desc = config.get("desc", "")
+		var cost = GameManager.get_singularity_cost(id)
+		cost_text = "Kosten: %s DM" % _format_number(cost)
+		text_color = Color(0.9, 0.1, 0.65) # Magenta
+		
+	info_title_lbl.text = title
+	info_title_lbl.self_modulate = text_color
+	info_cost_lbl.text = cost_text
+	info_desc_lbl.text = desc
+
+func _format_cost_type(cost_type: String) -> String:
+	match cost_type:
+		"space_ore": return "Erz"
+		"cosmic_gas": return "Gas"
+		"star_crystals": return "Kristalle"
+		"stardust": return "Staub"
+		"dark_matter": return "Dunkelmaterie"
+	return cost_type
+
 func _process_supernova(delta: float) -> void:
 	if meltdown_active:
 		return
@@ -280,14 +357,34 @@ func _process_supernova(delta: float) -> void:
 		if supernova_alert_elapsed >= duration:
 			_trigger_meltdown()
 	else:
-		supernova_timer -= delta
+		var wd_lvl = GameManager.upgrade_levels.get("warp_drive", 0)
+		var wd_mult = 1.0 + float(wd_lvl) * 0.15
+		
+		# Apply antimatter_engine (+10% supernova speedup if star_crystals >= 5)
+		var ae_lvl = float(GameManager.upgrade_levels.get("antimatter_engine", 0))
+		if ae_lvl > 0 and GameManager.star_crystals >= 5.0:
+			wd_mult *= (1.0 + ae_lvl * 0.10)
+			
+		supernova_timer -= delta * wd_mult
 		if supernova_timer <= 0.0:
 			supernova_alert_active = true
+			GameManager.reaktor_charging = true
 			supernova_alert_elapsed = 0.0
 			alarm_sound_timer = 0.0
 
 func _trigger_meltdown() -> void:
+	# Apply warp_stabilizer chance (-10% meltdown chance per level)
+	var ws_lvl = GameManager.upgrade_levels.get("warp_stabilizer", 0)
+	if ws_lvl > 0 and randf() <= float(ws_lvl) * 0.10:
+		supernova_alert_active = false
+		$HUD/VBoxContainer/CoreContainer/AsteroidCore.supernova_ring_scale = 0.0
+		supernova_timer = randf_range(90.0, 120.0)
+		GameManager.reaktor_charging = false
+		JuiceManager.spawn_floating_text(self, Vector2(270, 360), "WARP-STABILISATOR AKTIV!\nKernschmelze verhindert!", true, Color(0.0, 0.94, 1.0), 3.0)
+		return
+
 	supernova_alert_active = false
+	GameManager.reaktor_charging = false
 	$HUD/VBoxContainer/CoreContainer/AsteroidCore.supernova_ring_scale = 0.0
 	supernova_timer = randf_range(90.0, 120.0)
 	
@@ -334,6 +431,7 @@ func _on_bubble_popped(bubble) -> void:
 	if active_meltdown_bubbles.size() == 0 and meltdown_minigame_active:
 		# Success: Reactor stabilized!
 		meltdown_minigame_active = false
+		GameManager.reaktor_charging = false
 		
 		# Give massive resource reward based on click power
 		var power = GameManager.get_click_power()
@@ -366,9 +464,10 @@ func _process_meltdown(delta: float) -> void:
 					b.queue_free()
 			active_meltdown_bubbles.clear()
 			
-			# Activate actual meltdown penalty (offline for 6 seconds)
+			# Activate actual meltdown penalty (offline time reduced by energy_shielding)
 			meltdown_active = true
-			meltdown_timer = 6.0
+			var es_lvl = GameManager.upgrade_levels.get("energy_shielding", 0)
+			meltdown_timer = max(0.5, 6.0 - float(es_lvl) * 1.0)
 			GameManager.meltdown_active = true
 			GameManager.stats_changed.emit()
 			
@@ -392,6 +491,16 @@ func _process_meltdown(delta: float) -> void:
 			JuiceManager.spawn_floating_text(self, Vector2(270, 360), "Reaktor abgekühlt\nAutomatisierung online", false, Color(0.0, 0.94, 1.0))
 
 func _process_comets_and_drones(delta: float) -> void:
+	# Meteor Collector auto-collection logic
+	var collector_lvl = GameManager.upgrade_levels.get("meteor_collector", 0)
+	if collector_lvl > 0:
+		if randf() <= float(collector_lvl) * 0.01 * delta: # 1% chance per second per level
+			var active_comets = get_tree().get_nodes_in_group("comets")
+			if active_comets.size() > 0:
+				var target_comet = active_comets[0]
+				if is_instance_valid(target_comet) and not target_comet.is_queued_for_deletion():
+					_on_comet_clicked(target_comet)
+
 	# Comet Spawn Clock
 	comet_timer += delta
 	if comet_timer >= next_comet_time:
@@ -403,6 +512,14 @@ func _process_comets_and_drones(delta: float) -> void:
 		if GameManager.get_current_sector_type() == "anomaly":
 			sector_mult = 0.5
 		next_comet_time = randf_range(45.0, 60.0) * max(0.5, rate_mult) * sector_mult
+		# Apply astral_luck (-5% comet timer per level)
+		var al_lvl = GameManager.upgrade_levels.get("astral_luck", 0)
+		var al_mult = max(0.2, 1.0 - float(al_lvl) * 0.05)
+		next_comet_time *= al_mult
+		# Apply meteor_magnet (+10% faster spawn rate per level)
+		var magnet_lvl = GameManager.upgrade_levels.get("meteor_magnet", 0)
+		var magnet_mult = max(0.2, 1.0 - float(magnet_lvl) * 0.10)
+		next_comet_time *= magnet_mult
 		spawn_cosmic_comet()
 		
 	var core_pos = $HUD/VBoxContainer/CoreContainer/AsteroidCore.global_position + Vector2(150, 150)
@@ -411,7 +528,6 @@ func _process_comets_and_drones(delta: float) -> void:
 	# Spawn/despawn Drones (Orbit style)
 	var target_count = GameManager.get_drone_count()
 	while drones.size() < target_count:
-		var idx = drones.size()
 		drones.append({
 			"angle": randf_range(0.0, TAU),
 			"orbit_rx": randf_range(160.0, 210.0),
@@ -448,6 +564,29 @@ func _process_comets_and_drones(delta: float) -> void:
 				var yield_val = float(int(power * 0.12) + 1)
 				if GameManager.equipped_artifacts.has("cosmic_collector"):
 					yield_val = float(int(yield_val * 1.4) + 1)
+					
+				# Apply drone_cargo_expansion (+10% yield per level)
+				var cargo_lvl = float(GameManager.upgrade_levels.get("drone_cargo_expansion", 0))
+				yield_val *= (1.0 + cargo_lvl * 0.10)
+				
+				# Apply stellar_wind_turbines (+15% yield per level when overdrive active)
+				var swt_lvl = float(GameManager.upgrade_levels.get("stellar_wind_turbines", 0))
+				if swt_lvl > 0 and GameManager.overdrive_active:
+					yield_val *= (1.0 + swt_lvl * 0.15)
+					
+				# Apply quantum_recharge (+5% chance per level for double drone yield)
+				var qr_lvl = GameManager.upgrade_levels.get("quantum_recharge", 0)
+				if qr_lvl > 0 and randf() <= float(qr_lvl) * 0.05:
+					yield_val *= 2.0
+					JuiceManager.spawn_floating_text(self, core_pos + Vector2(randf_range(-40, 40), randf_range(-40, 40)), "QUANTEN-DOPPEL-TICK!", true, Color(1.0, 0.84, 0.0))
+
+				# Apply asteroid_scanner (+5% chance per level to activate 10s Scanner Boost)
+				var as_lvl = GameManager.upgrade_levels.get("asteroid_scanner", 0)
+				if as_lvl > 0 and randf() <= float(as_lvl) * 0.05 and GameManager.scanner_boost_timer <= 0.0:
+					GameManager.scanner_boost_timer = 10.0
+					GameManager.stats_changed.emit()
+					JuiceManager.spawn_floating_text(self, core_pos + Vector2(0, -60), "ASTEROIDEN-SCANNER BOOST!\nBohrer-Produktion verdoppelt!", true, Color(0.22, 1.0, 0.08))
+
 				GameManager.add_resource("space_ore", yield_val)
 				JuiceManager.spawn_floating_text(self, core_pos + Vector2(randf_range(-30,30), randf_range(-30,30)), "+" + str(int(yield_val)), false, Color(0.0, 0.94, 1.0))
 				
@@ -477,7 +616,7 @@ func _on_drone_container_draw() -> void:
 			
 		# Draw spaceship texture
 		if drone_ship_tex:
-			var size = Vector2(24, 24)
+			var ship_size = Vector2(24, 24)
 			# Set local drawing transform
 			drone_container.draw_set_transform(pos, angle, Vector2.ONE)
 			
@@ -485,10 +624,10 @@ func _on_drone_container_draw() -> void:
 			if drone_fire_tex and not drone["laser_active"]:
 				var fire_size = Vector2(8, 12)
 				# Offset so fire is drawn behind the ship's engine nozzle (nozzle is at bottom y = size.y/2 = 12)
-				drone_container.draw_texture_rect(drone_fire_tex, Rect2(-fire_size.x/2, size.y/2 - 2, fire_size.x, fire_size.y), false)
+				drone_container.draw_texture_rect(drone_fire_tex, Rect2(-fire_size.x/2, ship_size.y/2 - 2, fire_size.x, fire_size.y), false)
 				
 			# Draw the ship on top
-			drone_container.draw_texture_rect(drone_ship_tex, Rect2(-size/2, size), false)
+			drone_container.draw_texture_rect(drone_ship_tex, Rect2(-ship_size/2, ship_size), false)
 			
 			# Reset transform
 			drone_container.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
@@ -772,8 +911,8 @@ func _check_offline_popup() -> void:
 		GameManager.save_game()
 
 func _format_seconds(sec: float) -> String:
-	var hours = int(sec) / 3600
-	var minutes = (int(sec) % 3600) / 60
+	var hours = int(sec / 3600.0)
+	var minutes = int((int(sec) % 3600) / 60.0)
 	var seconds = int(sec) % 60
 	
 	if hours > 0:
@@ -961,6 +1100,7 @@ func _on_core_clicked(click_pos: Vector2, is_crit: bool, _ore_amount: float) -> 
 		var ring_scale = $HUD/VBoxContainer/CoreContainer/AsteroidCore.supernova_ring_scale
 		if ring_scale >= 0.92 and ring_scale <= 1.15:
 			supernova_alert_active = false
+			GameManager.reaktor_charging = false
 			$HUD/VBoxContainer/CoreContainer/AsteroidCore.supernova_ring_scale = 0.0
 			supernova_timer = randf_range(80.0, 110.0)
 			GameManager.add_stat("stabilizations", 1.0)
@@ -973,7 +1113,8 @@ func _on_core_clicked(click_pos: Vector2, is_crit: bool, _ore_amount: float) -> 
 			GameManager.add_resource("space_ore", reward)
 			
 			GameManager.overdrive_active = true
-			GameManager.overdrive_timer = 15.0
+			var gov_lvl = GameManager.upgrade_levels.get("overdrive_governor", 0)
+			GameManager.overdrive_timer = 15.0 + float(gov_lvl) * 1.5
 			
 			JuiceManager.spawn_floating_text(self, click_pos, "PERFEKT ABGEFANGEN!\n+150x Klick-Ertrag\nOverdrive-Protokoll aktiv!", true, Color(0.22, 1.0, 0.08))
 		else:
@@ -1118,137 +1259,13 @@ func create_shop_row(title: String, desc: String, cost: float, cost_type: String
 	return panel
 
 func rebuild_upgrade_lists() -> void:
-	for child in upgrades_list.get_children():
-		child.queue_free()
-		
-	var power_cost = GameManager.get_upgrade_cost("click_power")
-	var power_lvl = GameManager.upgrade_levels["click_power"]
-	var row_power = create_shop_row(
-		"Laser-Klicker", 
-		"Erhöht die manuelle Abbauleistung. Basis +1. Skaliert den Ertrag.", 
-		power_cost, "space_ore", power_lvl, 
-		func(): GameManager.buy_upgrade("click_power")
-	)
-	upgrades_list.add_child(row_power)
-	
-	var cc_cost = GameManager.get_upgrade_cost("crit_chance")
-	var cc_lvl = GameManager.upgrade_levels["crit_chance"]
-	if power_lvl >= 3 or cc_lvl >= 1:
-		var cc_desc = "Kritische Chance: +1%% (Aktuell: %d%%)" % int(GameManager.get_crit_chance() * 100.0)
-		var row_cc = create_shop_row(
-			"Präzisionslinse", 
-			cc_desc, 
-			cc_cost, "space_ore", cc_lvl, 
-			func(): GameManager.buy_upgrade("crit_chance")
-		)
-		upgrades_list.add_child(row_cc)
-	
-	var cm_cost = GameManager.get_upgrade_cost("crit_multiplier")
-	var cm_lvl = GameManager.upgrade_levels["crit_multiplier"]
-	if cc_lvl >= 1 or cm_lvl >= 1:
-		var cm_desc = "Crit multiplier: +30%% (Current: %.1fx)" % GameManager.get_crit_multiplier()
-		var row_cm = create_shop_row(
-			"Hyperladungs-Kern", 
-			cm_desc, 
-			cm_cost, "space_ore", cm_lvl, 
-			func(): GameManager.buy_upgrade("crit_multiplier")
-		)
-		upgrades_list.add_child(row_cm)
+	pass
 
 func rebuild_automation_lists() -> void:
-	for child in automation_list.get_children():
-		child.queue_free()
-		
-	var drill_cost = GameManager.get_upgrade_cost("drill")
-	var drill_lvl = GameManager.upgrade_levels["drill"]
-	var drill_rate = GameManager.get_production_rate("drill")
-	var row_drill = create_shop_row(
-		"Plasmabohrer", 
-		"Automatisiert den Abbau. Produktion: +1.5 Erz/Sek. (Gesamt: %.1f Erz/s)" % drill_rate, 
-		drill_cost, "space_ore", drill_lvl, 
-		func(): GameManager.buy_upgrade("drill")
-	)
-	automation_list.add_child(row_drill)
-	
-	var siphon_cost = GameManager.get_upgrade_cost("siphon")
-	var siphon_lvl = GameManager.upgrade_levels["siphon"]
-	if drill_lvl >= 2 or siphon_lvl >= 1:
-		var siphon_rate = GameManager.get_production_rate("siphon")
-		var row_siphon = create_shop_row(
-			"Atmosphärischer Siphon", 
-			"Saugt Gase aus der Anomalie: +0.4 Gas/Sek. (Gesamt: %.2f Gas/s)" % siphon_rate, 
-			siphon_cost, "space_ore", siphon_lvl, 
-			func(): GameManager.buy_upgrade("siphon")
-		)
-		automation_list.add_child(row_siphon)
-	
-	var synth_cost = GameManager.get_upgrade_cost("synthesizer")
-	var synth_lvl = GameManager.upgrade_levels["synthesizer"]
-	if siphon_lvl >= 1 or synth_lvl >= 1:
-		var synth_rate = GameManager.get_production_rate("synthesizer")
-		var row_synth = create_shop_row(
-			"Kristallsynthetisierer", 
-			"Kondensiert Gas in Kristalle: +0.10 Kristalle/Sek. (Gesamt: %.3f Kristall/s)" % synth_rate, 
-			synth_cost, "space_ore", synth_lvl, 
-			func(): GameManager.buy_upgrade("synthesizer")
-		)
-		automation_list.add_child(row_synth)
-	
-	var d_count_cost = GameManager.get_upgrade_cost("drone_count")
-	var d_count_lvl = GameManager.upgrade_levels["drone_count"]
-	if synth_lvl >= 1 or d_count_lvl >= 1:
-		var row_d_count = create_shop_row(
-			"Sammler-Drohnen", 
-			"Spawnt automatische Drohnen, die Trümmer sammeln. (Max 8)", 
-			d_count_cost, "space_ore", d_count_lvl, 
-			func(): GameManager.buy_upgrade("drone_count")
-		)
-		automation_list.add_child(row_d_count)
-	
-	var d_speed_cost = GameManager.get_upgrade_cost("drone_speed")
-	var d_speed_lvl = GameManager.upgrade_levels["drone_speed"]
-	if d_count_lvl >= 1 or d_speed_lvl >= 1:
-		var row_d_speed = create_shop_row(
-			"Drohnen-Triebwerke", 
-			"Erhöht die Fluggeschwindigkeit der Drohnen um +25 Einheiten/s pro Stufe.", 
-			d_speed_cost, "space_ore", d_speed_lvl, 
-			func(): GameManager.buy_upgrade("drone_speed")
-		)
-		automation_list.add_child(row_d_speed)
+	pass
 
 func rebuild_singularity_upgrades() -> void:
-	for child in singularity_upgrades_list.get_children():
-		child.queue_free()
-		
-	var gp_cost = GameManager.get_singularity_cost("gravitational_pull")
-	var gp_lvl = GameManager.singularity_upgrades["gravitational_pull"]
-	var gp_row = create_shop_row(
-		"Gravitationszug",
-		"Erhöht Kometenhäufigkeit um +10% und deren Fluggeschwindigkeit.",
-		gp_cost, "dark_matter", gp_lvl,
-		func(): GameManager.buy_singularity_upgrade("gravitational_pull")
-	)
-	singularity_upgrades_list.add_child(gp_row)
-	
-	var qt_cost = GameManager.get_singularity_cost("quantum_tunneling")
-	var qt_lvl = GameManager.singularity_upgrades["quantum_tunneling"]
-	var qt_row = create_shop_row(
-		"Quantentunnelung",
-		"Gewährt 5% Chance auf doppelte Erträge bei jeder Automation.",
-		qt_cost, "dark_matter", qt_lvl,
-		func(): GameManager.buy_singularity_upgrade("quantum_tunneling")
-	)
-	singularity_upgrades_list.add_child(qt_row)
-	
-	var cs_cost = GameManager.get_singularity_cost("chamber_stabilization")
-	var cs_lvl = GameManager.singularity_upgrades["chamber_stabilization"]
-	var cs_row = create_shop_row(
-		"Kammerstabilisierung",
-		"Verlängert das Super-Nova Containment-Reaktionsfenster um +15%.",
-		cs_cost, "dark_matter", cs_lvl,
-		func(): GameManager.buy_singularity_upgrade("chamber_stabilization")
-	)
-	singularity_upgrades_list.add_child(cs_row)
+	pass
 
 func _on_invest_stardust() -> void:
 	GameManager.invest_stardust(10.0)
@@ -1318,61 +1335,13 @@ func _refresh_purchase_buttons() -> void:
 # ----------------- SKILL TREE VISUALS -----------------
 
 func setup_skill_tree_buttons() -> void:
-	for skill_id in GameManager.SKILL_CONFIG.keys():
-		var node_path = "HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/Nodes/" + skill_id
-		var btn = get_node_or_null(node_path)
-		if btn is Button:
-			for c in btn.pressed.get_connections():
-				btn.pressed.disconnect(c.callable)
-			btn.pressed.connect(func(): _on_skill_node_pressed(skill_id))
-	_refresh_skill_nodes()
+	pass
 
-func _on_skill_node_pressed(skill_id: String) -> void:
-	if GameManager.buy_skill(skill_id):
-		$HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/SkillLineDrawer.queue_redraw()
+func _on_skill_node_pressed(_skill_id: String) -> void:
+	pass
 
 func _refresh_skill_nodes() -> void:
-	for skill_id in GameManager.SKILL_CONFIG.keys():
-		var node_path = "HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/Nodes/" + skill_id
-		var btn = get_node_or_null(node_path)
-		if btn is Button:
-			var config = GameManager.SKILL_CONFIG[skill_id]
-			btn.text = config["name"] + "\n(" + str(int(config["cost"])) + " Kristalle)"
-			btn.tooltip_text = config["desc"]
-			
-			var btn_style = StyleBoxFlat.new()
-			btn_style.border_width_left = 2
-			btn_style.border_width_right = 2
-			btn_style.border_width_top = 2
-			btn_style.border_width_bottom = 2
-			btn_style.corner_radius_top_left = 8
-			btn_style.corner_radius_top_right = 8
-			btn_style.corner_radius_bottom_right = 8
-			btn_style.corner_radius_bottom_left = 8
-			
-			if GameManager.is_skill_unlocked(skill_id):
-				btn_style.bg_color = Color(0.10, 0.35, 0.10, 0.75)
-				btn_style.border_color = Color(0.22, 1.0, 0.08)
-				btn.add_theme_color_override("font_color", Color(0.22, 1.0, 0.08))
-				btn.disabled = false
-			elif GameManager.can_unlock_skill(skill_id):
-				btn_style.bg_color = Color(0.22, 0.22, 0.08, 0.75)
-				btn_style.border_color = Color(1.0, 0.84, 0.0)
-				btn.add_theme_color_override("font_color", Color(1.0, 0.84, 0.0))
-				btn.disabled = false
-			else:
-				btn_style.bg_color = Color(0.08, 0.05, 0.15, 0.8)
-				btn_style.border_color = Color(0.25, 0.25, 0.25)
-				btn.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
-				btn.disabled = true
-				
-			btn.add_theme_stylebox_override("normal", btn_style)
-			btn.add_theme_stylebox_override("hover", btn_style)
-			btn.add_theme_stylebox_override("disabled", btn_style)
-			
-	var line_drawer = get_node_or_null("HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/SkillLineDrawer")
-	if line_drawer:
-		line_drawer.queue_redraw()
+	pass
 
 # ----------------- COMET ACTIVE EVENTS -----------------
 

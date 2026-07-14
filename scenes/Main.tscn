@@ -1,10 +1,11 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scenes/Main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scenes/AsteroidCore.gd" id="2_core"]
 [ext_resource type="Script" path="res://scenes/SkillLineDrawer.gd" id="3_drawer"]
 [ext_resource type="PackedScene" path="res://scenes/FloatingText.tscn" id="4_text"]
 [ext_resource type="Script" path="res://scenes/SpaceBackground.gd" id="5_bg"]
+[ext_resource type="PackedScene" path="res://scenes/HexBoard.tscn" id="6_hexboard"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxHeader"]
 bg_color = Color(0.05, 0.03, 0.11, 0.85)
@@ -278,148 +279,64 @@ layout_mode = 2
 size_flags_vertical = 3
 theme_override_styles/panel = SubResource("StyleBoxPanel")
 
-[node name="UpgradesPanel" type="ScrollContainer" parent="HUD/VBoxContainer/PanelContainer"]
+[node name="UpgradesPanel" parent="HUD/VBoxContainer/PanelContainer" instance=ExtResource("6_hexboard")]
 layout_mode = 2
-horizontal_scroll_mode = 0
-scroll_deadzone = 12
+board_type = "click"
 
-[node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/UpgradesPanel"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
-
-[node name="AutomationPanel" type="ScrollContainer" parent="HUD/VBoxContainer/PanelContainer"]
+[node name="AutomationPanel" parent="HUD/VBoxContainer/PanelContainer" instance=ExtResource("6_hexboard")]
 visible = false
 layout_mode = 2
-horizontal_scroll_mode = 0
-scroll_deadzone = 12
+board_type = "automation"
 
-[node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/AutomationPanel"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
-
-[node name="SkillTreePanel" type="ScrollContainer" parent="HUD/VBoxContainer/PanelContainer"]
+[node name="SkillTreePanel" parent="HUD/VBoxContainer/PanelContainer" instance=ExtResource("6_hexboard")]
 visible = false
 layout_mode = 2
-horizontal_scroll_mode = 0
-scroll_deadzone = 12
+board_type = "skill"
 
-[node name="SkillTreeContent" type="Control" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel"]
-custom_minimum_size = Vector2(0, 480)
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="SkillLineDrawer" type="Control" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent"]
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-script = ExtResource("3_drawer")
-
-[node name="Nodes" type="Control" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent"]
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="ore_magnet" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/Nodes"]
-layout_mode = 0
-offset_left = 190.0
-offset_top = 20.0
-offset_right = 320.0
-offset_bottom = 80.0
-theme_override_font_sizes/font_size = 11
-text = "Ore Magnet"
-
-[node name="gas_igniter" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/Nodes"]
-layout_mode = 0
-offset_left = 40.0
-offset_top = 140.0
-offset_right = 180.0
-offset_bottom = 200.0
-theme_override_font_sizes/font_size = 11
-text = "Gas Igniter"
-
-[node name="quantum_drill" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/Nodes"]
-layout_mode = 0
-offset_left = 330.0
-offset_top = 140.0
-offset_right = 470.0
-offset_bottom = 200.0
-theme_override_font_sizes/font_size = 11
-text = "Quantum Drill"
-
-[node name="crystal_refiner" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/Nodes"]
-layout_mode = 0
-offset_left = 40.0
-offset_top = 260.0
-offset_right = 180.0
-offset_bottom = 320.0
-theme_override_font_sizes/font_size = 11
-text = "Crystal Refiner"
-
-[node name="cosmic_forge" type="Button" parent="HUD/VBoxContainer/PanelContainer/SkillTreePanel/SkillTreeContent/Nodes"]
-layout_mode = 0
-offset_left = 190.0
-offset_top = 370.0
-offset_right = 320.0
-offset_bottom = 430.0
-theme_override_font_sizes/font_size = 11
-text = "Cosmic Forge"
-
-[node name="SingularityPanel" type="ScrollContainer" parent="HUD/VBoxContainer/PanelContainer"]
+[node name="SingularityPanel" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer"]
 visible = false
 layout_mode = 2
-horizontal_scroll_mode = 0
-scroll_deadzone = 12
-
-[node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel"]
-layout_mode = 2
-size_flags_horizontal = 3
 theme_override_constants/separation = 12
 
-[node name="DarkMatterHeader" type="PanelContainer" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox"]
+[node name="DarkMatterHeader" type="PanelContainer" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel"]
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxHeader")
 
-[node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/DarkMatterHeader"]
+[node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/DarkMatterHeader"]
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="Title" type="Label" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/DarkMatterHeader/VBox"]
+[node name="Title" type="Label" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/DarkMatterHeader/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1.0, 0.45, 0.0, 1.0)
+theme_override_colors/font_color = Color(1, 0.45, 0, 1)
 theme_override_font_sizes/font_size = 15
 text = "SINGULARITY CHAMBER"
 horizontal_alignment = 1
 
-[node name="DMAmount" type="Label" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/DarkMatterHeader/VBox"]
+[node name="DMAmount" type="Label" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/DarkMatterHeader/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1.0, 0.8, 0.0, 1.0)
+theme_override_colors/font_color = Color(1, 0.8, 0, 1)
 theme_override_font_sizes/font_size = 18
 text = "Dark Matter: 0.0"
 horizontal_alignment = 1
 
-[node name="InvestTitle" type="Label" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/DarkMatterHeader/VBox"]
+[node name="InvestTitle" type="Label" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/DarkMatterHeader/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1.0)
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
 theme_override_font_sizes/font_size = 11
 text = "Stardust Invested: 0"
 horizontal_alignment = 1
 
-[node name="InvestBtn" type="Button" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox/DarkMatterHeader/VBox"]
+[node name="InvestBtn" type="Button" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/DarkMatterHeader/VBox"]
 custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "Invest 10 Stardust (+0.2 DM/s)"
 
-[node name="UpgradesList" type="VBoxContainer" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel/VBox"]
+[node name="UpgradesList" parent="HUD/VBoxContainer/PanelContainer/SingularityPanel" instance=ExtResource("6_hexboard")]
 layout_mode = 2
-theme_override_constants/separation = 8
+size_flags_vertical = 3
+board_type = "singularity"
 
 [node name="PrestigePanel" type="ScrollContainer" parent="HUD/VBoxContainer/PanelContainer"]
 visible = false
@@ -486,6 +403,39 @@ horizontal_alignment = 1
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
+
+[node name="InfoPanel" type="PanelContainer" parent="HUD/VBoxContainer"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxHeader")
+
+[node name="VBox" type="VBoxContainer" parent="HUD/VBoxContainer/InfoPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+alignment = 1
+
+[node name="HBox" type="HBoxContainer" parent="HUD/VBoxContainer/InfoPanel/VBox"]
+layout_mode = 2
+
+[node name="InfoTitle" type="Label" parent="HUD/VBoxContainer/InfoPanel/VBox/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0, 0.94, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "Upgrade-Details"
+
+[node name="InfoCost" type="Label" parent="HUD/VBoxContainer/InfoPanel/VBox/HBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 1, 0.4, 1)
+theme_override_font_sizes/font_size = 11
+text = ""
+
+[node name="InfoDesc" type="Label" parent="HUD/VBoxContainer/InfoPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.8, 0.85, 1)
+theme_override_font_sizes/font_size = 10
+text = "Bewege den Mauszeiger über ein Upgrade für Details."
+autowrap_mode = 2
 
 [node name="TelemetryDrawer" type="Control" parent="HUD"]
 layout_mode = 3

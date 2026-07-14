@@ -249,11 +249,44 @@ var upgrade_levels: Dictionary = {
 	"click_power": 1,
 	"crit_chance": 0,
 	"crit_multiplier": 0,
+	"combo_booster": 0,
+	"quantum_clicks": 0,
+	"crystal_shards": 0,
+	"solar_flare": 0,
+	"plasma_charge": 0,
+	"gamma_overload": 0,
+	"resonance_harmonic": 0,
+	"matter_duplication": 0,
+	"astral_luck": 0,
+	"stellar_dust_extractor": 0,
+	"meteor_magnet": 0,
+	"stardust_catalyst": 0,
+	"photon_amplifier": 0,
+	"hyper_drive_clicks": 0,
+	"nova_resonance": 0,
+	"quantum_vacuum_extractor": 0,
 	"drill": 0,       # Ore miner
 	"siphon": 0,      # Gas miner
 	"synthesizer": 0, # Crystal miner
+	"nanite_swarm": 0,
+	"plasma_condenser": 0,
+	"quantum_pipeline": 0,
 	"drone_count": 0, # Drone network count
-	"drone_speed": 0  # Drone speed upgrade
+	"drone_speed": 0,  # Drone speed upgrade
+	"meteor_collector": 0,
+	"warp_drive": 0,
+	"overdrive_governor": 0,
+	"efficiency_algorithms": 0,
+	"vacuum_collector": 0,
+	"dark_matter_siphon": 0,
+	"drone_cargo_expansion": 0,
+	"stellar_wind_turbines": 0,
+	"warp_stabilizer": 0,
+	"energy_shielding": 0,
+	"asteroid_scanner": 0,
+	"quantum_recharge": 0,
+	"matter_converter": 0,
+	"antimatter_engine": 0
 }
 
 # Stardust permanent perks
@@ -272,6 +305,14 @@ var singularity_upgrades: Dictionary = {
 
 # Unlocked Skill Tree Nodes
 var unlocked_skills: Array = []
+
+# Discovered nodes for Fog of War Waben-System
+signal upgrade_discovered(id: String)
+signal skill_discovered(id: String)
+
+var discovered_upgrades: Array = ["click_power", "drill"]
+var discovered_skills: Array = ["ore_magnet"]
+var discovered_singularity: Array = ["gravitational_pull"]
 
 # Game Loop Accumulator
 var time_accumulator: float = 0.0
@@ -296,109 +337,402 @@ var overdrive_timer: float = 0.0
 var magnetic_net_active: bool = false
 var magnetic_net_timer: float = 0.0
 var meltdown_active: bool = false
+var reaktor_charging: bool = false
+var scanner_boost_timer: float = 0.0
 
 # Upgrade Configurations (Base Cost, Multiplier, Rates)
-const UPGRADE_CONFIG = {
+var UPGRADE_CONFIG: Dictionary = {
 	"click_power": {
 		"base_cost": 8.0,
 		"cost_mult": 1.10,
-		"cost_type": "space_ore"
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(0, 0),
+		"deps": []
 	},
 	"crit_chance": {
 		"base_cost": 40.0,
 		"cost_mult": 1.14,
-		"cost_type": "space_ore"
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(1, 0),
+		"deps": ["click_power"]
 	},
 	"crit_multiplier": {
 		"base_cost": 90.0,
 		"cost_mult": 1.15,
-		"cost_type": "space_ore"
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(2, -1),
+		"deps": ["crit_chance"]
+	},
+	"combo_booster": {
+		"base_cost": 25.0,
+		"cost_mult": 1.25,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(0, 1),
+		"deps": ["click_power"]
+	},
+	"quantum_clicks": {
+		"base_cost": 150.0,
+		"cost_mult": 1.30,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(1, 1),
+		"deps": ["click_power"]
+	},
+	"crystal_shards": {
+		"base_cost": 450.0,
+		"cost_mult": 1.32,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(2, 1),
+		"deps": ["quantum_clicks"]
+	},
+	"solar_flare": {
+		"base_cost": 1500.0,
+		"cost_mult": 1.45,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(3, 0),
+		"deps": ["crit_multiplier", "crystal_shards"]
 	},
 	"drill": {
 		"base_cost": 35.0,
 		"cost_mult": 1.12,
-		"cost_type": "space_ore"
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(0, 0),
+		"deps": []
 	},
 	"siphon": {
 		"base_cost": 200.0,
 		"cost_mult": 1.14,
-		"cost_type": "space_ore"
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(-1, 1),
+		"deps": ["drill"]
 	},
 	"synthesizer": {
 		"base_cost": 800.0,
 		"cost_mult": 1.16,
-		"cost_type": "space_ore"
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(-1, 2),
+		"deps": ["siphon"]
+	},
+	"nanite_swarm": {
+		"base_cost": 85.0,
+		"cost_mult": 1.20,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(0, 2),
+		"deps": ["drill", "siphon"]
+	},
+	"plasma_condenser": {
+		"base_cost": 350.0,
+		"cost_mult": 1.22,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(-2, 2),
+		"deps": ["siphon"]
+	},
+	"quantum_pipeline": {
+		"base_cost": 1200.0,
+		"cost_mult": 1.28,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(-2, 3),
+		"deps": ["synthesizer", "plasma_condenser"]
 	},
 	"drone_count": {
 		"base_cost": 500.0,
 		"cost_mult": 1.50,
-		"cost_type": "space_ore"
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(1, 0),
+		"deps": ["drill"]
 	},
 	"drone_speed": {
 		"base_cost": 300.0,
 		"cost_mult": 1.40,
-		"cost_type": "space_ore"
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(2, 0),
+		"deps": ["drone_count"]
+	},
+	"meteor_collector": {
+		"base_cost": 650.0,
+		"cost_mult": 1.26,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(1, 2),
+		"deps": ["drone_count"]
+	},
+	"warp_drive": {
+		"base_cost": 800.0,
+		"cost_mult": 1.24,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(2, 1),
+		"deps": ["drone_speed"]
+	},
+	"plasma_charge": {
+		"base_cost": 15.0,
+		"cost_mult": 1.15,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(0, -1),
+		"deps": ["click_power"]
+	},
+	"resonance_harmonic": {
+		"base_cost": 65.0,
+		"cost_mult": 1.20,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(1, -1),
+		"deps": ["crit_chance"]
+	},
+	"gamma_overload": {
+		"base_cost": 250.0,
+		"cost_mult": 1.26,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(3, -1),
+		"deps": ["crit_multiplier"]
+	},
+	"matter_duplication": {
+		"base_cost": 750.0,
+		"cost_mult": 1.34,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(3, 1),
+		"deps": ["crystal_shards"]
+	},
+	"stellar_dust_extractor": {
+		"base_cost": 1800.0,
+		"cost_mult": 1.48,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(2, 2),
+		"deps": ["crystal_shards"]
+	},
+	"astral_luck": {
+		"base_cost": 2200.0,
+		"cost_mult": 1.50,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(4, 0),
+		"deps": ["solar_flare"]
+	},
+	"efficiency_algorithms": {
+		"base_cost": 120.0,
+		"cost_mult": 1.22,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(0, 3),
+		"deps": ["nanite_swarm"]
+	},
+	"vacuum_collector": {
+		"base_cost": 180.0,
+		"cost_mult": 1.21,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(-1, 3),
+		"deps": ["nanite_swarm"]
+	},
+	"dark_matter_siphon": {
+		"base_cost": 2800.0,
+		"cost_mult": 1.38,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(-2, 4),
+		"deps": ["quantum_pipeline"]
+	},
+	"stellar_wind_turbines": {
+		"base_cost": 450.0,
+		"cost_mult": 1.24,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(3, 0),
+		"deps": ["drone_speed"]
+	},
+	"drone_cargo_expansion": {
+		"base_cost": 950.0,
+		"cost_mult": 1.28,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(2, 2),
+		"deps": ["meteor_collector"]
+	},
+	"overdrive_governor": {
+		"base_cost": 1100.0,
+		"cost_mult": 1.30,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(3, 1),
+		"deps": ["warp_drive"]
+	},
+	"meteor_magnet": {
+		"base_cost": 2200.0,
+		"cost_mult": 1.48,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(4, -1),
+		"deps": ["astral_luck"]
+	},
+	"stardust_catalyst": {
+		"base_cost": 2800.0,
+		"cost_mult": 1.50,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(2, 3),
+		"deps": ["stellar_dust_extractor"]
+	},
+	"photon_amplifier": {
+		"base_cost": 35.0,
+		"cost_mult": 1.18,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(0, -2),
+		"deps": ["plasma_charge"]
+	},
+	"hyper_drive_clicks": {
+		"base_cost": 2500.0,
+		"cost_mult": 1.52,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(4, 1),
+		"deps": ["astral_luck"]
+	},
+	"nova_resonance": {
+		"base_cost": 85.0,
+		"cost_mult": 1.22,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(1, -2),
+		"deps": ["resonance_harmonic"]
+	},
+	"quantum_vacuum_extractor": {
+		"base_cost": 1900.0,
+		"cost_mult": 1.42,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(3, -2),
+		"deps": ["gamma_overload"]
+	},
+	"warp_stabilizer": {
+		"base_cost": 1300.0,
+		"cost_mult": 1.32,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(3, 2),
+		"deps": ["overdrive_governor"]
+	},
+	"energy_shielding": {
+		"base_cost": 1500.0,
+		"cost_mult": 1.34,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(4, 1),
+		"deps": ["overdrive_governor"]
+	},
+	"asteroid_scanner": {
+		"base_cost": 1200.0,
+		"cost_mult": 1.26,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(2, 3),
+		"deps": ["drone_cargo_expansion"]
+	},
+	"quantum_recharge": {
+		"base_cost": 850.0,
+		"cost_mult": 1.25,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(1, 3),
+		"deps": ["meteor_collector"]
+	},
+	"matter_converter": {
+		"base_cost": 250.0,
+		"cost_mult": 1.24,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(-1, 4),
+		"deps": ["vacuum_collector"]
+	},
+	"antimatter_engine": {
+		"base_cost": 1400.0,
+		"cost_mult": 1.26,
+		"cost_type": "space_ore",
+		"grid_coords": Vector2i(4, 0),
+		"deps": ["stellar_wind_turbines"]
 	}
 }
 
+# Upgrade Descriptions for HUD Info-Panel
+var UPGRADE_DESCRIPTIONS: Dictionary = {
+	"click_power": "Erhöht den Erze-Ertrag bei jedem manuellen Klick auf den Kern.",
+	"crit_chance": "Erhöht die Chance auf kritische Klicks, die massiven Bonusschaden verursachen.",
+	"crit_multiplier": "Multipliziert den Ertrag von kritischen Klicks.",
+	"combo_booster": "Erhöht das maximale Combo-Limit für manuelle Klicks, was die Klickstärke steigert.",
+	"quantum_clicks": "Verleiht manuellen Klicks eine Chance von +3% pro Stufe, doppelte Ressourcen zu generieren.",
+	"crystal_shards": "Chance von +2% Gas / +0.5% Kristalle pro Stufe, bei jedem Klick abgespalten zu werden.",
+	"solar_flare": "Triggert nach einer Anzahl Klicks eine Eruption, die die Produktion für kurze Zeit verdoppelt.",
+	"plasma_charge": "Erhöht die manuelle Klickstärke permanent um +1% deines aktuellen Gasvorrats pro Stufe.",
+	"resonance_harmonic": "Erhöht die Chance auf den nächsten kritischen Klick um +1% pro Klick (resettet bei Crit).",
+	"gamma_overload": "Kritische Klicks haben eine Chance von +10% pro Stufe, eine 5s Overdrive-Eruption auszulösen.",
+	"matter_duplication": "Gewährt kritischen Klicks eine Chance von +25% pro Stufe, 4-fache Ressourcen zu erzeugen.",
+	"stellar_dust_extractor": "Verleiht manuellen Klicks eine Chance von +0.1% pro Stufe, direkt +1 Sternenstaub zu gewinnen.",
+	"astral_luck": "Verringert das Spawn-Intervall von fliegenden Kometen im Sektor permanent um -5% pro Stufe.",
+	"drill": "Bohrt vollautomatisch Weltraumerz aus dem Asteroiden.",
+	"siphon": "Saugt kosmisches Gas aus den Gaswolken des Sektors.",
+	"synthesizer": "Synthetisiert wertvolle Sternkristalle.",
+	"nanite_swarm": "Passive Naniten bauen Erz ab. Generierung skaliert mit der Menge deines Erzes.",
+	"plasma_condenser": "Gewinnt passiv Gas und erhöht die Effizienz aller Gas-Siphons um +5% pro Level.",
+	"quantum_pipeline": "Konvertiert vollautomatisch sekündlich einen Teil deines Gases in Sternkristalle.",
+	"drone_count": "Erhöht die Anzahl aktiver Transporter-Drohnen im Sektor.",
+	"drone_speed": "Erhöht die Fluggeschwindigkeit aller Drohnen.",
+	"meteor_collector": "Fängt passiv im Sektor vorbeifliegende Kometen vollautomatisch ab.",
+	"warp_drive": "Beschleunigt die Zeitaufladung des Supernova-Reaktors für schnellere Energieentladungen.",
+	"efficiency_algorithms": "Reduziert die Upgrade-Kosten für alle Shop- & Automations-Upgrades um -1.5% pro Stufe (max. -30%).",
+	"vacuum_collector": "Gewinnt passiv +0.08 Gas pro Sekunde pro Stufe durch die Erschütterung des Erzabbau-Bohrers.",
+	"dark_matter_siphon": "Saugt passiv eine winzige Menge Dunkelmaterie (+0.001 DM/s pro Stufe) aus dem Vakuum.",
+	"stellar_wind_turbines": "Steigert die passive Erzeugung von Bohrern und Drohnen um +15% pro Stufe, während Overdrive aktiv ist.",
+	"drone_cargo_expansion": "Vergrößert den Frachtraum aller Drohnen, was deren Erzgewinnung permanent um +10% pro Stufe erhöht.",
+	"overdrive_governor": "Erhöht die Gesamtdauer aller aktiven Overdrive-Protokolle permanent um +1.5s pro Stufe."
+}
+
 # Singularity Upgrades Configuration (Cost in Dark Matter)
-const SINGULARITY_CONFIG = {
+var SINGULARITY_CONFIG: Dictionary = {
 	"gravitational_pull": {
 		"name": "Gravitationszug",
 		"base_cost": 1.0,
 		"cost_mult": 1.80,
-		"desc": "+10% Kometen-Frequenz & -Geschwindigkeit"
+		"desc": "+10% Kometen-Frequenz & -Geschwindigkeit",
+		"grid_coords": Vector2i(0, 0),
+		"deps": []
 	},
 	"quantum_tunneling": {
 		"name": "Quantentunnelung",
 		"base_cost": 2.0,
 		"cost_mult": 2.00,
-		"desc": "5% Chance auf doppelte Ticks bei Automation"
+		"desc": "5% Chance auf doppelte Ticks bei Automation",
+		"grid_coords": Vector2i(1, 0),
+		"deps": ["gravitational_pull"]
 	},
 	"chamber_stabilization": {
 		"name": "Kammerstabilisierung",
 		"base_cost": 3.0,
 		"cost_mult": 1.90,
-		"desc": "+15% Super-Nova Reaktionsfenster"
+		"desc": "+15% Super-Nova Reaktionsfenster",
+		"grid_coords": Vector2i(0, 1),
+		"deps": ["quantum_tunneling"]
 	}
 }
 
 # Skill Tree Configuration
-const SKILL_CONFIG = {
+var SKILL_CONFIG: Dictionary = {
 	"ore_magnet": {
 		"name": "Erzmagnet",
 		"cost": 10.0,
 		"cost_type": "star_crystals",
 		"desc": "+25% Klick-Erz. Schaltet Overdrive-Zauber frei.",
-		"deps": []
+		"deps": [],
+		"grid_coords": Vector2i(0, 0)
 	},
 	"gas_igniter": {
 		"name": "Gaszünder",
 		"cost": 25.0,
 		"cost_type": "star_crystals",
 		"desc": "+20% Gas. Schaltet Anomalie-Siphon-Zauber frei.",
-		"deps": ["ore_magnet"]
+		"deps": ["ore_magnet"],
+		"grid_coords": Vector2i(-1, 1)
 	},
 	"crystal_refiner": {
 		"name": "Kristallraffinerie",
 		"cost": 50.0,
 		"cost_type": "star_crystals",
 		"desc": "Kritische Klicks erzeugen Gas/Kristalle.",
-		"deps": ["gas_igniter"]
+		"deps": ["gas_igniter"],
+		"grid_coords": Vector2i(-1, 2)
 	},
 	"quantum_drill": {
 		"name": "Quantenbohrer",
 		"cost": 75.0,
 		"cost_type": "star_crystals",
 		"desc": "+30% Erzbohrer. Schaltet Magnetnetz-Zauber frei.",
-		"deps": ["ore_magnet"]
+		"deps": ["ore_magnet"],
+		"grid_coords": Vector2i(1, 0)
 	},
 	"cosmic_forge": {
 		"name": "Kosmische Schmiede",
 		"cost": 150.0,
 		"cost_type": "star_crystals",
 		"desc": "+100% Sternenstaub-Ertrag bei Reset.",
-		"deps": ["crystal_refiner", "quantum_drill"]
+		"deps": ["crystal_refiner", "quantum_drill"],
+		"grid_coords": Vector2i(0, 2)
 	}
 }
 
@@ -424,6 +758,11 @@ func _process(delta: float) -> void:
 		if magnetic_net_timer <= 0.0:
 			magnetic_net_active = false
 			stats_changed.emit()
+			
+	if scanner_boost_timer > 0.0:
+		scanner_boost_timer -= delta
+		if scanner_boost_timer <= 0.0:
+			stats_changed.emit()
 
 	# Idle Income Loop
 	time_accumulator += delta
@@ -437,6 +776,65 @@ func _process(delta: float) -> void:
 		save_game()
 		save_timer = 0.0
 
+# ----------------- WABEN DISCOVERY FOG OF WAR -----------------
+
+func check_discoveries() -> void:
+	var changed = false
+	
+	# Check standard upgrades
+	for up_id in UPGRADE_CONFIG.keys():
+		if not discovered_upgrades.has(up_id):
+			var config = UPGRADE_CONFIG[up_id]
+			var deps_met = true
+			for dep in config.get("deps", []):
+				if upgrade_levels.get(dep, 0) < 1:
+					deps_met = false
+					break
+			if deps_met:
+				discovered_upgrades.append(up_id)
+				upgrade_discovered.emit(up_id)
+				changed = true
+
+	# Check skills (talents)
+	for skill_id in SKILL_CONFIG.keys():
+		if not discovered_skills.has(skill_id):
+			var config = SKILL_CONFIG[skill_id]
+			var deps_met = true
+			for dep in config.get("deps", []):
+				if not unlocked_skills.has(dep):
+					deps_met = false
+					break
+			if deps_met:
+				discovered_skills.append(skill_id)
+				skill_discovered.emit(skill_id)
+				changed = true
+				
+	# Check singularity
+	for sing_id in SINGULARITY_CONFIG.keys():
+		if not discovered_singularity.has(sing_id):
+			var config = SINGULARITY_CONFIG[sing_id]
+			var deps_met = true
+			for dep in config.get("deps", []):
+				if singularity_upgrades.get(dep, 0) < 1:
+					deps_met = false
+					break
+			if deps_met:
+				discovered_singularity.append(sing_id)
+				changed = true
+
+	if changed:
+		save_game()
+		stats_changed.emit()
+
+func is_upgrade_discovered(id: String) -> bool:
+	return discovered_upgrades.has(id)
+
+func is_skill_discovered(id: String) -> bool:
+	return discovered_skills.has(id)
+
+func is_singularity_discovered(id: String) -> bool:
+	return discovered_singularity.has(id)
+
 # ----------------- ECONOMY MATH -----------------
 
 func get_upgrade_cost(id: String) -> float:
@@ -449,7 +847,10 @@ func get_upgrade_cost(id: String) -> float:
 	if id == "drone_count" and lvl >= 8:
 		return 999999999.0
 		
-	return floor(config["base_cost"] * pow(config["cost_mult"], lvl))
+	var base_cost = config["base_cost"] * pow(config["cost_mult"], lvl)
+	var discount_lvl = float(upgrade_levels.get("efficiency_algorithms", 0))
+	var discount = min(0.30, discount_lvl * 0.015)
+	return floor(base_cost * (1.0 - discount))
 
 func get_upgrade_cost_type(id: String) -> String:
 	if not UPGRADE_CONFIG.has(id):
@@ -465,8 +866,9 @@ func buy_upgrade(id: String) -> bool:
 		
 	if spend_resource(type, cost):
 		upgrade_levels[id] += 1
+		check_discoveries()
 		stats_changed.emit()
-		SoundManager.play_sound(SoundManager.upgrade_stream, 0.0, -2.0)
+		SoundManager.play_sound(SoundManager.upgrade_stream, 0.0, -14.0)
 		save_game()
 		return true
 	return false
@@ -515,9 +917,13 @@ func get_production_rate(id: String) -> float:
 	var base_rate = 0.0
 	var mult = 1.0 + get_global_production_multiplier()
 	
-	# Apply active spells modifier (Overdrive gives +200% production)
+	# Apply active spells modifier (Overdrive gives +200% production, +400% with nova_resonance during warning)
 	if overdrive_active:
-		mult += 2.0
+		var nr_lvl = upgrade_levels.get("nova_resonance", 0)
+		if nr_lvl > 0 and reaktor_charging:
+			mult += 4.0
+		else:
+			mult += 2.0
 		
 	match id:
 		"drill":
@@ -528,6 +934,11 @@ func get_production_rate(id: String) -> float:
 				mult += 0.01
 			if get_current_sector_type() == "ore":
 				mult += 0.60
+			var swt_lvl = float(upgrade_levels.get("stellar_wind_turbines", 0))
+			if swt_lvl > 0 and overdrive_active:
+				mult += swt_lvl * 0.15
+			if scanner_boost_timer > 0.0:
+				mult += 1.0
 		"siphon":
 			base_rate = lvl * 0.4
 			if unlocked_skills.has("gas_igniter"):
@@ -536,6 +947,8 @@ func get_production_rate(id: String) -> float:
 				mult += 0.01
 			if get_current_sector_type() == "gas":
 				mult += 0.60
+			var condenser_lvl = float(upgrade_levels.get("plasma_condenser", 0))
+			mult += condenser_lvl * 0.05
 		"synthesizer":
 			base_rate = lvl * 0.1
 			
@@ -568,14 +981,55 @@ func _process_idle_income(tick_delta: float) -> void:
 	if qt_level > 0 and randf() <= (float(qt_level) * 0.05):
 		double_mult = 2.0
 		
+	# Apply plasma_condenser passive gas generation (0.15 Gas/s per level)
+	var condenser_lvl = float(upgrade_levels.get("plasma_condenser", 0))
+	if condenser_lvl > 0:
+		gas_sec += condenser_lvl * 0.15
+		
+	# Apply vacuum_collector passive gas generation (0.08 Gas/s per level)
+	var vacuum_lvl = float(upgrade_levels.get("vacuum_collector", 0))
+	if vacuum_lvl > 0:
+		gas_sec += vacuum_lvl * 0.08
+		
 	add_resource("space_ore", ore_sec * tick_delta * double_mult)
 	add_resource("cosmic_gas", gas_sec * tick_delta * double_mult)
 	add_resource("star_crystals", crystal_sec * tick_delta * double_mult)
+	
+	# Apply nanite_swarm passive ore generation based on current owned ore (0.05% of ore/s per level, capped at 15/s per level)
+	var nanite_lvl = float(upgrade_levels.get("nanite_swarm", 0))
+	if nanite_lvl > 0:
+		var interest = space_ore * 0.0005 * nanite_lvl
+		var cap = nanite_lvl * 15.0
+		add_resource("space_ore", min(interest, cap) * tick_delta)
+		
+	# Apply quantum_pipeline passive gas-to-crystal conversion (converts 0.5% of gas/s into crystals at a 4:1 ratio per level)
+	var pipeline_lvl = float(upgrade_levels.get("quantum_pipeline", 0))
+	if pipeline_lvl > 0 and cosmic_gas > 0.0:
+		var conversion_rate = cosmic_gas * 0.005 * pipeline_lvl
+		var converted_gas = conversion_rate * tick_delta
+		if spend_resource("cosmic_gas", converted_gas):
+			var crystal_yield = converted_gas * 0.25
+			add_resource("star_crystals", crystal_yield)
 	
 	# Passive Dark Matter generation from invested stardust
 	if stardust_invested > 0.0:
 		var dm_gained = stardust_invested * 0.02 * tick_delta
 		dark_matter += dm_gained
+		
+	# Apply dark_matter_siphon passive dark matter generation (+0.001 DM/s per level)
+	var dm_siphon_lvl = float(upgrade_levels.get("dark_matter_siphon", 0))
+	if dm_siphon_lvl > 0:
+		var dm_gained = dm_siphon_lvl * 0.001 * tick_delta
+		dark_matter += dm_gained
+		
+	# Apply matter_converter passive conversion (converts 1% of ore/s into gas at 10:1 ratio per level)
+	var converter_lvl = float(upgrade_levels.get("matter_converter", 0))
+	if converter_lvl > 0 and space_ore > 0.0:
+		var conversion_rate = space_ore * 0.01 * converter_lvl
+		var converted_ore = conversion_rate * tick_delta
+		if spend_resource("space_ore", converted_ore):
+			var gas_yield = converted_ore * 0.10
+			add_resource("cosmic_gas", gas_yield)
 
 # ----------------- PASSIVE COLLECTOR DRONES -----------------
 
@@ -584,7 +1038,14 @@ func get_drone_count() -> int:
 
 func get_drone_speed() -> float:
 	var base_speed = 130.0
-	return base_speed + float(upgrade_levels["drone_speed"]) * 25.0
+	var speed_val = base_speed + float(upgrade_levels["drone_speed"]) * 25.0
+	
+	# Apply antimatter_engine (+10% drone speed per level if star_crystals >= 5)
+	var ae_lvl = float(upgrade_levels.get("antimatter_engine", 0))
+	if ae_lvl > 0 and star_crystals >= 5.0:
+		speed_val *= (1.0 + ae_lvl * 0.10)
+		
+	return speed_val
 
 # ----------------- SINGULARITY PRESTIGE & UPGRADES -----------------
 
@@ -593,7 +1054,7 @@ func invest_stardust(amount: float) -> bool:
 		stardust -= amount
 		stardust_invested += amount
 		stats_changed.emit()
-		SoundManager.play_sound(SoundManager.upgrade_stream, 0.08, -1.0)
+		SoundManager.play_sound(SoundManager.upgrade_stream, 0.08, -14.0)
 		save_game()
 		return true
 	return false
@@ -602,7 +1063,7 @@ func get_singularity_cost(id: String) -> float:
 	if not SINGULARITY_CONFIG.has(id):
 		return 0.0
 	var config = SINGULARITY_CONFIG[id]
-	var lvl = singularity_upgrades[id]
+	var lvl = singularity_upgrades.get(id, 0)
 	return floor(config["base_cost"] * pow(config["cost_mult"], lvl))
 
 func buy_singularity_upgrade(id: String) -> bool:
@@ -610,8 +1071,9 @@ func buy_singularity_upgrade(id: String) -> bool:
 	if dark_matter >= cost:
 		dark_matter -= cost
 		singularity_upgrades[id] += 1
+		check_discoveries()
 		stats_changed.emit()
-		SoundManager.play_sound(SoundManager.upgrade_stream, 0.05, 0.0)
+		SoundManager.play_sound(SoundManager.upgrade_stream, 0.05, -14.0)
 		save_game()
 		return true
 	return false
@@ -657,6 +1119,8 @@ func is_skill_unlocked(id: String) -> bool:
 	return unlocked_skills.has(id)
 
 func can_unlock_skill(id: String) -> bool:
+	if not SKILL_CONFIG.has(id):
+		return false
 	if unlocked_skills.has(id):
 		return false
 		
@@ -679,9 +1143,10 @@ func buy_skill(id: String) -> bool:
 	
 	if spend_resource(cost_type, cost):
 		unlocked_skills.append(id)
+		check_discoveries()
 		skill_unlocked.emit(id)
 		stats_changed.emit()
-		SoundManager.play_sound(SoundManager.upgrade_stream, 0.05, -2.0)
+		SoundManager.play_sound(SoundManager.upgrade_stream, 0.05, -14.0)
 		return true
 		
 	return false
@@ -725,6 +1190,12 @@ func trigger_prestige() -> bool:
 	# Drones are preserved too!
 	
 	unlocked_skills.clear()
+	
+	# Reset discovered nodes
+	discovered_upgrades = ["click_power", "drill"]
+	discovered_skills = ["ore_magnet"]
+	discovered_singularity = ["gravitational_pull"]
+	check_discoveries()
 	
 	overdrive_active = false
 	magnetic_net_active = false
@@ -773,6 +1244,12 @@ func hard_reset() -> void:
 	# Reset skills
 	unlocked_skills.clear()
 	
+	# Reset discovered nodes
+	discovered_upgrades = ["click_power", "drill"]
+	discovered_skills = ["ore_magnet"]
+	discovered_singularity = ["gravitational_pull"]
+	check_discoveries()
+	
 	# Reset achievements & stats
 	unlocked_achievements.clear()
 	for k in stats.keys():
@@ -815,7 +1292,7 @@ func buy_perk(id: String) -> bool:
 		stardust -= cost
 		perk_levels[id] += 1
 		stats_changed.emit()
-		SoundManager.play_sound(SoundManager.upgrade_stream, 0.1, -1.0)
+		SoundManager.play_sound(SoundManager.upgrade_stream, 0.1, -14.0)
 		save_game()
 		return true
 	return false
@@ -950,6 +1427,11 @@ func save_game() -> void:
 	# Skills
 	config.set_value("skills", "unlocked", unlocked_skills)
 	
+	# Discovered Hex Nodes (Fog of War)
+	config.set_value("discoveries", "upgrades", discovered_upgrades)
+	config.set_value("discoveries", "skills", discovered_skills)
+	config.set_value("discoveries", "singularity", discovered_singularity)
+	
 	# Achievements & Stats
 	config.set_value("achievements", "unlocked", unlocked_achievements)
 	config.set_value("achievements", "stats", stats)
@@ -1004,11 +1486,32 @@ func load_game() -> void:
 		"click_power": 1,
 		"crit_chance": 0,
 		"crit_multiplier": 0,
+		"combo_booster": 0,
+		"quantum_clicks": 0,
+		"crystal_shards": 0,
+		"solar_flare": 0,
+		"plasma_charge": 0,
+		"gamma_overload": 0,
+		"resonance_harmonic": 0,
+		"matter_duplication": 0,
+		"astral_luck": 0,
+		"stellar_dust_extractor": 0,
 		"drill": 0,
 		"siphon": 0,
 		"synthesizer": 0,
+		"nanite_swarm": 0,
+		"plasma_condenser": 0,
+		"quantum_pipeline": 0,
 		"drone_count": 0,
-		"drone_speed": 0
+		"drone_speed": 0,
+		"meteor_collector": 0,
+		"warp_drive": 0,
+		"overdrive_governor": 0,
+		"efficiency_algorithms": 0,
+		"vacuum_collector": 0,
+		"dark_matter_siphon": 0,
+		"drone_cargo_expansion": 0,
+		"stellar_wind_turbines": 0
 	}
 	for up_id in default_upgrades.keys():
 		var val = config.get_value("upgrades", up_id, default_upgrades[up_id])
@@ -1049,6 +1552,28 @@ func load_game() -> void:
 		unlocked_skills = loaded_skills
 	else:
 		unlocked_skills = []
+		
+	# Discovered Hex Nodes loading
+	var loaded_disc_up = config.get_value("discoveries", "upgrades", ["click_power", "drill"])
+	if typeof(loaded_disc_up) == TYPE_ARRAY:
+		discovered_upgrades = loaded_disc_up
+	else:
+		discovered_upgrades = ["click_power", "drill"]
+		
+	var loaded_disc_sk = config.get_value("discoveries", "skills", ["ore_magnet"])
+	if typeof(loaded_disc_sk) == TYPE_ARRAY:
+		discovered_skills = loaded_disc_sk
+	else:
+		discovered_skills = ["ore_magnet"]
+		
+	var loaded_disc_sing = config.get_value("discoveries", "singularity", ["gravitational_pull"])
+	if typeof(loaded_disc_sing) == TYPE_ARRAY:
+		discovered_singularity = loaded_disc_sing
+	else:
+		discovered_singularity = ["gravitational_pull"]
+		
+	# Call check_discoveries to ensure consistency after load
+	check_discoveries()
 		
 	# Achievements (safely load array)
 	var loaded_achievements = config.get_value("achievements", "unlocked", [])

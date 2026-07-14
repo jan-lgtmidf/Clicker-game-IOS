@@ -30,7 +30,7 @@ func _ready() -> void:
 	# Load sound streams from assets (with procedural fallback)
 	click_stream = _load_sound_or_fallback("res://assets/SCI-FI_UI_SFX_PACK/Clicks/Click_Mid.wav", func(): return _generate_click_sound(false))
 	crit_stream = _load_sound_or_fallback("res://assets/SCI-FI_UI_SFX_PACK/Clicks/Click_Pitched_Up.wav", func(): return _generate_click_sound(true))
-	upgrade_stream = _load_sound_or_fallback("res://assets/SCI-FI_UI_SFX_PACK/Tone1/Major/Tone1A_MajorTriadUp.wav", func(): return _generate_upgrade_sound())
+	upgrade_stream = _generate_upgrade_sound()
 	prestige_stream = _load_sound_or_fallback("res://assets/SCI-FI_UI_SFX_PACK/Impacts/Impact_1.wav", func(): return _generate_prestige_sound())
 	
 	alarm_stream = _load_sound_or_fallback("res://assets/SCI-FI_UI_SFX_PACK/Glitches/Glitch.wav", func(): return _generate_alarm_sound())
@@ -148,17 +148,15 @@ func _generate_click_sound(is_crit: bool) -> AudioStreamWAV:
 	wav.data = bytes
 	return wav
 
-# Upgrade Chime (arpeggio)
+# Upgrade Chime (extremely soft, gentle dual sine wave bell)
 func _generate_upgrade_sound() -> AudioStreamWAV:
 	var wav = AudioStreamWAV.new()
 	wav.format = AudioStreamWAV.FORMAT_16_BITS
 	wav.mix_rate = MIX_RATE
 	wav.stereo = false
 	
-	var notes = [523.25, 659.25, 783.99, 1046.50] # C5, E5, G5, C6
-	var note_duration = 0.06
-	var total_duration = note_duration * notes.size()
-	var num_samples = int(MIX_RATE * total_duration)
+	var duration = 0.25
+	var num_samples = int(MIX_RATE * duration)
 	
 	var bytes = PackedByteArray()
 	bytes.resize(num_samples * 2)
@@ -166,17 +164,17 @@ func _generate_upgrade_sound() -> AudioStreamWAV:
 	var phase = 0.0
 	for i in range(num_samples):
 		var t = float(i) / num_samples
-		var note_idx = int(t * notes.size())
-		note_idx = clamp(note_idx, 0, notes.size() - 1)
-		
-		var freq = notes[note_idx]
+		var freq = lerp(660.0, 880.0, t)
 		phase += (freq * TAU) / MIX_RATE
 		
-		var sample = (abs(fmod(phase, TAU) - PI) / PI) * 2.0 - 1.0
-		var sub_t = fmod(float(i), MIX_RATE * note_duration) / (MIX_RATE * note_duration)
-		var envelope = 1.0 - sub_t
+		# Pure sine wave
+		var sample = sin(phase)
 		
-		var val = int(sample * envelope * 24000.0)
+		# Exponential decay
+		var envelope = exp(-t * 8.0)
+		
+		# Extremely low amplitude (only 3000 instead of 24000)
+		var val = int(sample * envelope * 3000.0)
 		bytes.encode_s16(i * 2, val)
 		
 	wav.data = bytes
